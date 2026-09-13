@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-black text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subscription Manager</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .tab-active { border-bottom: 2px solid #6366f1; color: #818cf8; font-weight: 600; }
+    </style>
+</head>
+<body class="h-full flex flex-col bg-black text-slate-100 antialiased selection:bg-indigo-500 selection:text-white">
+
+    <!-- Top Header Navigation -->
+    <header class="bg-zinc-950 border-b border-zinc-800 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <!-- App Brand -->
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-md shadow-indigo-900/50">
+                        <i class="fa-solid fa-receipt"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold text-white leading-tight">SubTrack</h1>
+                        <p class="text-xs text-zinc-400 font-medium">Subscription & Expense Optimizer</p>
+                    </div>
+                </div>
+
+                <!-- Navigation Tabs -->
+                <nav class="flex space-x-8" aria-label="Views">
+                    <button id="nav-looking" onclick="switchView('looking')" class="tab-active py-5 px-1 inline-flex items-center text-sm font-medium transition-colors">
+                        <i class="fa-solid fa-list-check mr-2"></i> My Subscriptions
+                    </button>
+                    <button id="nav-adding" onclick="switchView('adding')" class="text-zinc-400 hover:text-zinc-200 py-5 px-1 inline-flex items-center text-sm font-medium transition-colors">
+                        <i class="fa-solid fa-plus-circle mr-2"></i> Add Subscription
+                    </button>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 bg-black">
+        
+        <!-- LOOKING VIEW -->
+        <section id="looking-view" class="space-y-6">
+            
+            <!-- Key Metrics Overview Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-zinc-900 p-5 rounded-2xl border border-zinc-800 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Monthly Expense</p>
+                        <h3 id="stat-monthly" class="text-2xl font-bold text-white mt-1">$0.00</h3>
+                        <p class="text-xs text-zinc-400 mt-0.5">Normalized monthly total</p>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-indigo-950 text-indigo-400 border border-indigo-800/40 flex items-center justify-center text-lg font-bold">
+                        <i class="fa-solid fa-calendar-days"></i>
+                    </div>
+                </div>
+
+                <div class="bg-zinc-900 p-5 rounded-2xl border border-zinc-800 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Yearly Spend</p>
+                        <h3 id="stat-yearly" class="text-2xl font-bold text-white mt-1">$0.00</h3>
+                        <p class="text-xs text-zinc-400 mt-0.5">Projected annual cost</p>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-emerald-950 text-emerald-400 border border-emerald-800/40 flex items-center justify-center text-lg font-bold">
+                        <i class="fa-solid fa-chart-line"></i>
+                    </div>
+                </div>
+
+                <div class="bg-zinc-900 p-5 rounded-2xl border border-zinc-800 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Active Services</p>
+                        <h3 id="stat-count" class="text-2xl font-bold text-white mt-1">0</h3>
+                        <p class="text-xs text-zinc-400 mt-0.5">Tracked subscriptions</p>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-blue-950 text-blue-400 border border-blue-800/40 flex items-center justify-center text-lg font-bold">
+                        <i class="fa-solid fa-box-archive"></i>
+                    </div>
+                </div>
+
+                <div class="bg-zinc-900 p-5 rounded-2xl border border-zinc-800 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-amber-500">Ending Soon</p>
+                        <h3 id="stat-ending" class="text-2xl font-bold text-amber-500 mt-1">0</h3>
+                        <p class="text-xs text-zinc-400 mt-0.5">Renewal cycle expiring</p>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-amber-950 text-amber-400 border border-amber-800/40 flex items-center justify-center text-lg font-bold">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Controls, Search, and Filters Bar -->
+            <div class="bg-zinc-900 p-4 rounded-2xl border border-zinc-800 shadow-sm flex flex-col lg:flex-row gap-4 justify-between items-stretch lg:items-center">
+                
+                <!-- Search Box -->
+                <div class="relative flex-1">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 text-sm"></i>
+                    <input type="text" id="filter-search" oninput="applyFilters()" placeholder="Search services..." class="w-full pl-10 pr-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-zinc-800 transition-all">
+                </div>
+
+                <!-- Filter Dropdowns -->
+                <div class="flex flex-wrap items-center gap-3">
+                    
+                    <!-- Billing Period Filter -->
+                    <div class="flex items-center space-x-2">
+                        <label for="filter-period" class="text-xs font-semibold text-zinc-400 uppercase">Period:</label>
+                        <select id="filter-period" onchange="applyFilters()" class="bg-zinc-800 border border-zinc-700 text-zinc-200 text-sm rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium">
+                            <option value="ALL">All Periods</option>
+                            <option value="Monthly">Monthly</option>
+                            <option value="Yearly">Yearly</option>
+                            <option value="Quarterly">Quarterly</option>
+                            <option value="Weekly">Weekly</option>
+                        </select>
+                    </div>
+
+                    <!-- Billing Cost Range Filter -->
+                    <div class="flex items-center space-x-2">
+                        <label for="filter-range" class="text-xs font-semibold text-zinc-400 uppercase">Cost Range:</label>
+                        <select id="filter-range" onchange="applyFilters()" class="bg-zinc-800 border border-zinc-700 text-zinc-200 text-sm rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium">
+                            <option value="ALL">All Prices</option>
+                            <option value="0-10">Under $10</option>
+                            <option value="10-50">$10 - $50</option>
+                            <option value="50-100">$50 - $100</option>
+                            <option value="100+">$100+</option>
+                        </select>
+                    </div>
+
+                    <!-- Sorting Order -->
+                    <div class="flex items-center space-x-2">
+                        <label for="filter-sort" class="text-xs font-semibold text-zinc-400 uppercase">Sort:</label>
+                        <select id="filter-sort" onchange="applyFilters()" class="bg-zinc-800 border border-zinc-700 text-zinc-200 text-sm rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium">
+                            <option value="ENDING_FIRST">Ending Cycles First (!)</option>
+                            <option value="COST_DESC">Cost: High to Low</option>
+                            <option value="COST_ASC">Cost: Low to High</option>
+                            <option value="NAME_ASC">Name: A to Z</option>
+                        </select>
+                    </div>
+
+                    <button onclick="resetFilters()" class="p-2 text-zinc-400 hover:text-zinc-200 rounded-xl hover:bg-zinc-800 transition-colors" title="Reset Filters">
+                        <i class="fa-solid fa-rotate-right"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Redundancy & Savings Analysis Banner -->
+            <div id="redundancy-banner" class="hidden bg-amber-950/40 border border-amber-800/50 rounded-2xl p-4 text-amber-200 flex items-start space-x-3 shadow-sm">
+                <div class="w-8 h-8 rounded-lg bg-amber-900/60 text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
+                    <i class="fa-solid fa-lightbulb"></i>
+                </div>
+                <div class="flex-1 text-sm">
+                    <h4 class="font-bold text-amber-200">Optimization & Redundancy Alert</h4>
+                    <p id="redundancy-text" class="text-amber-300/80 mt-0.5">Review duplicate or high-cost services to eliminate unused expenses.</p>
+                </div>
+            </div>
+
+            <!-- Subscriptions Table Card -->
+            <div class="bg-zinc-900 rounded-2xl border border-zinc-800 shadow-sm overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-zinc-950 border-b border-zinc-800 text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                                <th class="py-3.5 px-4 text-center w-12">Status</th>
+                                <th class="py-3.5 px-4">Service Name</th>
+                                <th class="py-3.5 px-4">Billing Period</th>
+                                <th class="py-3.5 px-4">Cost per Period</th>
+                                <th class="py-3.5 px-4">Payment Method</th>
+                                <th class="py-3.5 px-4">Next Renewal</th>
+                                <th class="py-3.5 px-4">Direct Links</th>
+                                <th class="py-3.5 px-4 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="subscriptions-table-body" class="divide-y divide-zinc-800 text-sm">
+                            <!-- Rows injected via JS -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Empty State Block -->
+                <div id="empty-state" class="py-16 text-center px-4">
+                    <div class="w-16 h-16 rounded-full bg-zinc-800 text-zinc-500 flex items-center justify-center mx-auto mb-4 text-2xl">
+                        <i class="fa-solid fa-folder-open"></i>
+                    </div>
+                    <h3 class="text-base font-bold text-white">No Subscriptions Found</h3>
+                    <p id="empty-state-subtitle" class="text-sm text-zinc-400 max-w-sm mx-auto mt-1">Your subscription list is currently empty. Add your first service to begin tracking expenses.</p>
+                    <button onclick="switchView('adding')" class="mt-5 inline-flex items-center px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium text-sm transition-colors shadow-sm shadow-indigo-900/50">
+                        <i class="fa-solid fa-plus mr-2"></i> Add Subscription
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ADDING VIEW -->
+        <section id="adding-view" class="hidden max-w-2xl mx-auto">
+            <div class="bg-zinc-900 p-6 sm:p-8 rounded-2xl border border-zinc-800 shadow-sm">
+                
+                <div class="mb-6 pb-6 border-b border-zinc-800">
+                    <h2 class="text-xl font-bold text-white">Add New Subscription</h2>
+                    <p class="text-xs text-zinc-400 mt-1">Enter your recurring subscription details accurately to compute uniform expense summaries.</p>
+                </div>
+
+                <form id="add-subscription-form" onsubmit="handleFormSubmit(event)" class="space-y-5">
+                    
+                    <!-- Service Name -->
+                    <div>
+                        <label for="service_name" class="block text-xs font-semibold uppercase text-zinc-300 mb-1.5">
+                            Service Name <span class="text-rose-500">*</span>
+                        </label>
+                        <input type="text" id="service_name" required placeholder="e.g. Netflix, Spotify, Adobe Creative Cloud" class="w-full px-3.5 py-2.5 bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-500 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                    </div>
+
+                    <!-- Grid for Cost & Uniform Billing Period -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        
+                        <!-- Cost per Period -->
+                        <div>
+                            <label for="cost_per_period" class="block text-xs font-semibold uppercase text-zinc-300 mb-1.5">
+                                Cost per Period ($) <span class="text-rose-500">*</span>
+                            </label>
+                            <div class="relative">
+                                <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 text-sm font-semibold">$</span>
+                                <input type="number" step="0.01" min="0" id="cost_per_period" required placeholder="9.99" class="w-full pl-8 pr-3.5 py-2.5 bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-500 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                            </div>
+                        </div>
+
+                        <!-- Mandatory Uniform Billing Period Dropdown -->
+                        <div>
+                            <label for="billing_period" class="block text-xs font-semibold uppercase text-zinc-300 mb-1.5">
+                                Billing Period <span class="text-rose-500">*</span>
+                            </label>
+                            <select id="billing_period" required class="w-full px-3.5 py-2.5 bg-zinc-800 border border-zinc-700 text-white rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                                <option value="" disabled selected class="text-zinc-500">Select billing cycle...</option>
+                                <option value="Monthly" class="text-white bg-zinc-800">Monthly</option>
+                                <option value="Yearly" class="text-white bg-zinc-800">Yearly</option>
+                                <option value="Quarterly" class="text-white bg-zinc-800">Quarterly</option>
+                                <option value="Weekly" class="text-white bg-zinc-800">Weekly</option>
+                            </select>
+                            <p class="text-[11px] text-zinc-500 mt-1">Standardized cycle for exact analytics.</p>
+                        </div>
+                    </div>
+
+                    <!-- Payment Method & Renewal Date -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        
+                        <!-- Payment Method -->
+                        <div>
+                            <label for="payment_method" class="block text-xs font-semibold uppercase text-zinc-300 mb-1.5">
+                                Payment Method
+                            </label>
+                            <input type="text" id="payment_method" placeholder="e.g. Visa ending 4092, PayPal" class="w-full px-3.5 py-2.5 bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-500 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                        </div>
+
+                        <!-- Next Renewal Date / Cycle End -->
+                        <div>
+                            <label for="next_billing_date" class="block text-xs font-semibold uppercase text-zinc-300 mb-1.5">
+                                Next Renewal / End Date
+                            </label>
+                            <input type="date" id="next_billing_date" class="w-full px-3.5 py-2.5 bg-zinc-800 border border-zinc-700 text-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                        </div>
+                    </div>
+
+                    <!-- Payment Link & Cancellation Link -->
+                    <div class="space-y-4">
+                        <div>
+                            <label for="payment_link" class="block text-xs font-semibold uppercase text-zinc-300 mb-1.5">
+                                Payment Link (URL)
+                            </label>
+                            <input type="url" id="payment_link" placeholder="https://billing.example.com" class="w-full px-3.5 py-2.5 bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-500 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                        </div>
+
+                        <div>
+                            <label for="cancellation_url" class="block text-xs font-semibold uppercase text-zinc-300 mb-1.5">
+                                Cancellation URL
+                            </label>
+                            <input type="url" id="cancellation_url" placeholder="https://example.com/account/cancel" class="w-full px-3.5 py-2.5 bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-500 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                        </div>
+                    </div>
+
+                    <!-- Cycle Ending Flag Toggle -->
+                    <div class="pt-2">
+                        <label class="relative flex items-center space-x-3 cursor-pointer">
+                            <input type="checkbox" id="is_ending_soon" class="w-4 h-4 text-indigo-600 bg-zinc-800 border-zinc-700 rounded focus:ring-indigo-500">
+                            <span class="text-sm font-medium text-zinc-300">Flag as cycle ending / targeted for cancellation (!)</span>
+                        </label>
+                    </div>
+
+                    <!-- Submit & Cancel Buttons -->
+                    <div class="pt-4 flex items-center justify-end space-x-3">
+                        <button type="button" onclick="switchView('looking')" class="px-5 py-2.5 border border-zinc-700 rounded-xl text-zinc-300 hover:bg-zinc-800 font-medium text-sm transition-colors">
+                            Cancel
+                        </button>
+                        <button type="submit" class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium text-sm transition-colors shadow-sm shadow-indigo-900/50">
+                            Save Subscription
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Custom Toast Message Notification -->
+    <div id="toast-message" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-zinc-800 border border-zinc-700 text-white px-4 py-3 rounded-xl shadow-lg flex items-center space-x-3 text-sm">
+        <span id="toast-text">Subscription saved!</span>
+    </div>
+
+    <script>
+        // Data Store initialized completely empty
+        let subscriptions = [];
+
+        // Load data on start if stored in localStorage
+        try {
+            const savedData = localStorage.getItem('user_subscriptions');
+            if (savedData) {
+                subscriptions = JSON.parse(savedData);
+            }
+        } catch (err) {
+            subscriptions = [];
+        }
+
+        // View Navigation Handler
+        function switchView(viewName) {
+            const lookingView = document.getElementById('looking-view');
+            const addingView = document.getElementById('adding-view');
+            const navLooking = document.getElementById('nav-looking');
+            const navAdding = document.getElementById('nav-adding');
+
+            if (viewName === 'looking') {
+                lookingView.classList.remove('hidden');
+                addingView.classList.add('hidden');
+                navLooking.className = 'tab-active py-5 px-1 inline-flex items-center text-sm font-medium transition-colors';
+                navAdding.className = 'text-zinc-400 hover:text-zinc-200 py-5 px-1 inline-flex items-center text-sm font-medium transition-colors';
+                renderTable();
+            } else {
+                lookingView.classList.add('hidden');
+                addingView.classList.remove('hidden');
+                navAdding.className = 'tab-active py-5 px-1 inline-flex items-center text-sm font-medium transition-colors';
+                navLooking.className = 'text-zinc-400 hover:text-zinc-200 py-5 px-1 inline-flex items-center text-sm font-medium transition-colors';
+            }
+        }
+
+        // Helper to convert cost to monthly normalized amount
+        function getNormalizedMonthlyCost(cost, period) {
+            const numericCost = parseFloat(cost) || 0;
+            switch(period) {
+                case 'Yearly': return numericCost / 12;
+                case 'Quarterly': return numericCost / 3;
+                case 'Weekly': return (numericCost * 52) / 12;
+                case 'Monthly':
+                default: return numericCost;
+            }
+        }
+
+        // Save state to Local Storage
+        function persistData() {
+            try {
+                localStorage.setItem('user_subscriptions', JSON.stringify(subscriptions));
+            } catch(e) {
+                console.warn('LocalStorage unavailable');
+            }
+        }
+
+        // Apply Filters & Sorting
+        function applyFilters() {
+            renderTable();
+        }
+
+        function resetFilters() {
+            document.getElementById('filter-search').value = '';
+            document.getElementById('filter-period').value = 'ALL';
+            document.getElementById('filter-range').value = 'ALL';
+            document.getElementById('filter-sort').value = 'ENDING_FIRST';
+            renderTable();
+        }
+
+        // Primary Render Function for Looking View
+        function renderTable() {
+            const tableBody = document.getElementById('subscriptions-table-body');
+            const emptyState = document.getElementById('empty-state');
+            const redundancyBanner = document.getElementById('redundancy-banner');
+
+            const searchQuery = document.getElementById('filter-search').value.toLowerCase().trim();
+            const periodFilter = document.getElementById('filter-period').value;
+            const rangeFilter = document.getElementById('filter-range').value;
+            const sortFilter = document.getElementById('filter-sort').value;
+
+            // 1. Filter Subscriptions
+            let filtered = subscriptions.filter(item => {
+                // Search filter
+                const matchesSearch = item.name.toLowerCase().includes(searchQuery) || 
+                                      (item.paymentMethod && item.paymentMethod.toLowerCase().includes(searchQuery));
+                
+                // Period filter
+                const matchesPeriod = (periodFilter === 'ALL') || (item.billingPeriod === periodFilter);
+
+                // Range filter
+                let matchesRange = true;
+                const normalizedMonthly = getNormalizedMonthlyCost(item.cost, item.billingPeriod);
+                if (rangeFilter === '0-10') matchesRange = normalizedMonthly <= 10;
+                else if (rangeFilter === '10-50') matchesRange = normalizedMonthly > 10 && normalizedMonthly <= 50;
+                else if (rangeFilter === '50-100') matchesRange = normalizedMonthly > 50 && normalizedMonthly <= 100;
+                else if (rangeFilter === '100+') matchesRange = normalizedMonthly > 100;
+
+                return matchesSearch && matchesPeriod && matchesRange;
+            });
+
+            // 2. Sort Subscriptions
+            filtered.sort((a, b) => {
+                const aEnding = a.isEndingSoon ? 1 : 0;
+                const bEnding = b.isEndingSoon ? 1 : 0;
+
+                if (sortFilter === 'ENDING_FIRST') {
+                    if (bEnding !== aEnding) return bEnding - aEnding; // Ending cycles moved to top
+                    return b.cost - a.cost;
+                } else if (sortFilter === 'COST_DESC') {
+                    return b.cost - a.cost;
+                } else if (sortFilter === 'COST_ASC') {
+                    return a.cost - b.cost;
+                } else if (sortFilter === 'NAME_ASC') {
+                    return a.name.localeCompare(b.name);
+                }
+                return 0;
+            });
+
+            // 3. Compute Stats
+            let totalMonthly = 0;
+            let totalYearly = 0;
+            let endingCount = 0;
+
+            subscriptions.forEach(sub => {
+                const mCost = getNormalizedMonthlyCost(sub.cost, sub.billingPeriod);
+                totalMonthly += mCost;
+                totalYearly += mCost * 12;
+                if (sub.isEndingSoon) endingCount++;
+            });
+
+            document.getElementById('stat-monthly').textContent = `$${totalMonthly.toFixed(2)}`;
+            document.getElementById('stat-yearly').textContent = `$${totalYearly.toFixed(2)}`;
+            document.getElementById('stat-count').textContent = subscriptions.length.toString();
+            document.getElementById('stat-ending').textContent = endingCount.toString();
+
+            // Redundancy Analysis Banner Check
+            if (subscriptions.length >= 3) {
+                redundancyBanner.classList.remove('hidden');
+                document.getElementById('redundancy-text').textContent = 
+                    `You are managing ${subscriptions.length} active subscriptions totaling $${(totalMonthly * 12).toFixed(2)} annually. Check your service list below to eliminate duplicate or low-usage accounts.`;
+            } else {
+                redundancyBanner.classList.add('hidden');
+            }
+
+            // 4. Render Table HTML
+            tableBody.innerHTML = '';
+
+            if (filtered.length === 0) {
+                emptyState.classList.remove('hidden');
+                document.getElementById('empty-state-subtitle').textContent = subscriptions.length === 0 
+                    ? 'Your subscription list is currently empty. Add your first service to begin tracking expenses.' 
+                    : 'No subscriptions match your current filter criteria.';
+            } else {
+                emptyState.classList.add('hidden');
+                
+                filtered.forEach(sub => {
+                    const row = document.createElement('tr');
+                    row.className = sub.isEndingSoon 
+                        ? 'bg-amber-950/40 hover:bg-amber-950/60 transition-colors border-l-4 border-l-amber-500' 
+                        : 'hover:bg-zinc-800/50 transition-colors';
+
+                    const formattedCost = `$${parseFloat(sub.cost).toFixed(2)}`;
+                    
+                    row.innerHTML = `
+                        <td class="py-4 px-4 text-center font-bold">
+                            ${sub.isEndingSoon 
+                                ? `<span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-500 text-slate-950 font-bold text-xs shadow-sm" title="Billing cycle ending / priority notice">!</span>` 
+                                : `<span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400" title="Active"></span>`}
+                        </td>
+                        <td class="py-4 px-4 font-semibold text-white">
+                            <div>${escapeHtml(sub.name)}</div>
+                            ${sub.isEndingSoon ? `<span class="text-[11px] font-medium text-amber-400">Renewal Cycle Ending</span>` : ''}
+                        </td>
+                        <td class="py-4 px-4 text-zinc-300 font-medium">
+                            <span class="inline-block px-2.5 py-1 bg-zinc-800 border border-zinc-700 rounded-lg text-xs font-semibold text-zinc-200">${escapeHtml(sub.billingPeriod)}</span>
+                        </td>
+                        <td class="py-4 px-4 text-white font-bold">
+                            ${formattedCost}
+                        </td>
+                        <td class="py-4 px-4 text-zinc-300">
+                            ${sub.paymentMethod ? `<span class="text-xs font-medium"><i class="fa-regular fa-credit-card mr-1 text-zinc-500"></i> ${escapeHtml(sub.paymentMethod)}</span>` : '<span class="text-zinc-600">-</span>'}
+                        </td>
+                        <td class="py-4 px-4 text-zinc-300 text-xs">
+                            ${sub.nextBillingDate ? escapeHtml(sub.nextBillingDate) : '<span class="text-zinc-600">Not set</span>'}
+                        </td>
+                        <td class="py-4 px-4 text-xs space-x-2">
+                            ${sub.paymentLink 
+                                ? `<a href="${escapeHtml(sub.paymentLink)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center text-indigo-400 hover:text-indigo-300 font-medium hover:underline"><i class="fa-solid fa-arrow-up-right-from-square mr-1"></i> Pay</a>` 
+                                : '<span class="text-zinc-600">-</span>'}
+                            ${sub.cancellationUrl 
+                                ? `<a href="${escapeHtml(sub.cancellationUrl)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center text-rose-400 hover:text-rose-300 font-medium hover:underline"><i class="fa-solid fa-ban mr-1"></i> Cancel</a>` 
+                                : ''}
+                        </td>
+                        <td class="py-4 px-4 text-right space-x-2">
+                            <button onclick="deleteSubscription('${sub.id}')" class="text-zinc-500 hover:text-rose-400 p-1.5 rounded-lg hover:bg-zinc-800 transition-colors" title="Delete subscription">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            }
+        }
+
+        // Add Subscription Form Submission Handler
+        function handleFormSubmit(event) {
+            event.preventDefault();
+
+            const name = document.getElementById('service_name').value.trim();
+            const cost = parseFloat(document.getElementById('cost_per_period').value);
+            const billingPeriod = document.getElementById('billing_period').value;
+            const paymentMethod = document.getElementById('payment_method').value.trim();
+            const nextBillingDate = document.getElementById('next_billing_date').value;
+            const paymentLink = document.getElementById('payment_link').value.trim();
+            const cancellationUrl = document.getElementById('cancellation_url').value.trim();
+            const isEndingSoon = document.getElementById('is_ending_soon').checked;
+
+            if (!name || isNaN(cost) || !billingPeriod) {
+                showToast('Please fill in all required fields.');
+                return;
+            }
+
+            const newSub = {
+                id: 'sub_' + Date.now(),
+                name,
+                cost,
+                billingPeriod,
+                paymentMethod,
+                nextBillingDate,
+                paymentLink,
+                cancellationUrl,
+                isEndingSoon
+            };
+
+            subscriptions.push(newSub);
+            persistData();
+
+            // Reset Form
+            document.getElementById('add-subscription-form').reset();
+
+            // Notify & Switch back to Looking View
+            showToast('Subscription added successfully!');
+            switchView('looking');
+        }
+
+        // Delete Subscription Handler
+        function deleteSubscription(id) {
+            subscriptions = subscriptions.filter(sub => sub.id !== id);
+            persistData();
+            renderTable();
+            showToast('Subscription removed');
+        }
+
+        // Helper for Toast Notifications (avoids alert())
+        function showToast(message) {
+            const toast = document.getElementById('toast-message');
+            const toastText = document.getElementById('toast-text');
+            toastText.textContent = message;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        // Helper to escape HTML characters
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/&/g, "&amp;")
+                      .replace(/</g, "&lt;")
+                      .replace(/>/g, "&gt;")
+                      .replace(/"/g, "&quot;")
+                      .replace(/'/g, "&#039;");
+        }
+
+        // Initial Load Event Listener
+        window.addEventListener('DOMContentLoaded', () => {
+            renderTable();
+        });
+    </script>
+</body>
+</html>
