@@ -1,1 +1,31 @@
-The app will collect user data about the various subscription-based services that they use. It will collect the service name, billing period, cost per period, payment method, payment link, and cancellation URL. The looking view will display all of this data as a table, with subscriptions whose billing cycles are ending moved to the top with some kind of indication (like an exclamation mark). A prospective user would be looking for a simple way to log and manage their subscriptions so they can easily analyze the services that they have been using, manage their expenses, and identify redundancies to avoid wasting money on unused services. The looking view would also have various filters that allow users to arrange data by billing period and by billing range. The adding view would be a separate page from the looking view and would feature text fields for adding the service name, payment/cancellation URLs, and amount due per period. These vary based on the subscription and have to be entered by the user. There would be a dropdown menu for selecting the billing period, since that is important for calculating costs and displaying summaries; accordingly, this section’s entries must be uniform and cannot vary based on an individual user’s spelling or capitalization. 
+Subscription Manager - Project Overview & Status
+
+Project Description
+
+The app collects user data about various subscription-based services. It captures the service name, billing period, cost per period, payment method, payment link, and cancellation URL.
+
+"My Subscriptions" View (Looking View): Displays all subscription data in a structured table. Subscriptions with billing cycles that are ending are highlighted and moved to the top with an indicator (e.g., an exclamation mark). Users can filter and arrange data by billing period and billing range to easily analyze active services, manage expenses, and spot redundancies to avoid wasting money.
+
+"Add Subscription" View (Adding View): A separate view featuring text fields for service name, payment/cancellation URLs, payment method, and amount due per period. A standardized dropdown menu is used for selecting the billing period to ensure uniform calculations and summaries across all entries.
+
+Where We Are Right Now
+
+Architecture: Built as a self-contained Single-Page Application (SPA) in a single HTML file (index.html) using Tailwind CSS and native JavaScript for dynamic view switching without page reloads.
+
+UI Theme & Styling: The main background color is set to pure black (bg-black) with high-contrast dark mode accents (bg-zinc-900, bg-zinc-950). The primary dashboard view tab is titled "My Subscriptions".
+
+Data State: The application initializes in a clean slate state (blank canvas) with no pre-populated mock data, ready for direct user input.
+
+Core Views:
+
+"My Subscriptions": Fully structured table layout with headers for Service, Cost, Billing Period, Payment Method, Quick Links, and Actions, complete with filter bar controls for billing period and cost range.
+
+"Add Subscription": Form view featuring user text fields for custom details and a controlled dropdown selector for billing frequencies (e.g., Monthly, Yearly, Weekly, Quarterly).
+
+Change Log
+
+v1.0.0 — Initial single-file web application structure created with view switching between subscription table and add form.
+
+v1.1.0 — Removed pre-populated sample data so the application starts completely blank for user entry.
+
+v1.2.0 — Updated main app background to pure black (bg-black) and renamed the primary dashboard tab/view from "Looking View" to "My Subscriptions".
