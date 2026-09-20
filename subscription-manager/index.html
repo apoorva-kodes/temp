@@ -8,6 +8,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Supabase JS Client v2 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <!-- Google Fonts: Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -326,17 +328,67 @@
     </div>
 
     <script>
+        // Replace these values with your actual Supabase URL & Anon Key:
+        const SUPABASE_URL = 'https://YOUR-SUPABASE-PROJECT.supabase.co';
+        const SUPABASE_ANON_KEY = 'YOUR-SUPABASE-ANON-KEY';
+
         // Data Store initialized completely empty
         let subscriptions = [];
+        let supabaseClient = null;
 
-        // Load data on start if stored in localStorage
-        try {
-            const savedData = localStorage.getItem('user_subscriptions');
-            if (savedData) {
-                subscriptions = JSON.parse(savedData);
+        function initSupabase() {
+            if (SUPABASE_URL && SUPABASE_ANON_KEY && !SUPABASE_URL.includes('YOUR-SUPABASE-PROJECT') && window.supabase) {
+                try {
+                    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                    fetchFromSupabase();
+                } catch (e) {
+                    console.error('Supabase initialization error:', e);
+                    loadLocalData();
+                }
+            } else {
+                loadLocalData();
             }
-        } catch (err) {
-            subscriptions = [];
+        }
+
+        function loadLocalData() {
+            try {
+                const savedData = localStorage.getItem('user_subscriptions');
+                if (savedData) {
+                    subscriptions = JSON.parse(savedData);
+                }
+            } catch (err) {
+                subscriptions = [];
+            }
+            renderTable();
+        }
+
+        async function fetchFromSupabase() {
+            if (!supabaseClient) return;
+            try {
+                const { data, error } = await supabaseClient
+                    .from('subscriptions')
+                    .select('*');
+
+                if (error) throw error;
+
+                if (data) {
+                    subscriptions = data.map(item => ({
+                        id: item.id,
+                        name: item.name,
+                        cost: parseFloat(item.cost) || 0,
+                        billingPeriod: item.billing_period,
+                        paymentMethod: item.payment_method || '',
+                        nextBillingDate: item.next_billing_date || '',
+                        paymentLink: item.payment_link || '',
+                        cancellationUrl: item.cancellation_url || '',
+                        isEndingSoon: !!item.is_ending_soon
+                    }));
+                }
+                renderTable();
+            } catch (err) {
+                console.error('Error fetching from Supabase:', err);
+                loadLocalData();
+            }
         }
 
         // View Navigation Handler
@@ -372,7 +424,7 @@
             }
         }
 
-        // Save state to Local Storage
+        // Save state to Local Storage as fallback
         function persistData() {
             try {
                 localStorage.setItem('user_subscriptions', JSON.stringify(subscriptions));
@@ -407,14 +459,11 @@
 
             // 1. Filter Subscriptions
             let filtered = subscriptions.filter(item => {
-                // Search filter
                 const matchesSearch = item.name.toLowerCase().includes(searchQuery) || 
                                       (item.paymentMethod && item.paymentMethod.toLowerCase().includes(searchQuery));
                 
-                // Period filter
                 const matchesPeriod = (periodFilter === 'ALL') || (item.billingPeriod === periodFilter);
 
-                // Range filter
                 let matchesRange = true;
                 const normalizedMonthly = getNormalizedMonthlyCost(item.cost, item.billingPeriod);
                 if (rangeFilter === '0-10') matchesRange = normalizedMonthly <= 10;
@@ -431,7 +480,7 @@
                 const bEnding = b.isEndingSoon ? 1 : 0;
 
                 if (sortFilter === 'ENDING_FIRST') {
-                    if (bEnding !== aEnding) return bEnding - aEnding; // Ending cycles moved to top
+                    if (bEnding !== aEnding) return bEnding - aEnding;
                     return b.cost - a.cost;
                 } else if (sortFilter === 'COST_DESC') {
                     return b.cost - a.cost;
@@ -530,7 +579,7 @@
         }
 
         // Add Subscription Form Submission Handler
-        function handleFormSubmit(event) {
+        async function handleFormSubmit(event) {
             event.preventDefault();
 
             const name = document.getElementById('service_name').value.trim();
@@ -559,6 +608,29 @@
                 isEndingSoon
             };
 
+            if (supabaseClient) {
+                try {
+                    const { data, error } = await supabaseClient.from('subscriptions').insert([{
+                        name,
+                        cost,
+                        billing_period: billingPeriod,
+                        payment_method: paymentMethod || null,
+                        next_billing_date: nextBillingDate || null,
+                        payment_link: paymentLink || null,
+                        cancellation_url: cancellationUrl || null,
+                        is_ending_soon: isEndingSoon
+                    }]).select();
+
+                    if (error) throw error;
+                    if (data && data[0]) {
+                        newSub.id = data[0].id;
+                    }
+                } catch (err) {
+                    console.error('Supabase insert error:', err);
+                    showToast('Saved locally (Supabase write failed)');
+                }
+            }
+
             subscriptions.push(newSub);
             persistData();
 
@@ -571,14 +643,23 @@
         }
 
         // Delete Subscription Handler
-        function deleteSubscription(id) {
+        async function deleteSubscription(id) {
+            if (supabaseClient && typeof id === 'string' && !id.startsWith('sub_')) {
+                try {
+                    const { error } = await supabaseClient.from('subscriptions').delete().eq('id', id);
+                    if (error) throw error;
+                } catch (err) {
+                    console.error('Supabase delete error:', err);
+                }
+            }
+
             subscriptions = subscriptions.filter(sub => sub.id !== id);
             persistData();
             renderTable();
             showToast('Subscription removed');
         }
 
-        // Helper for Toast Notifications (avoids alert())
+        // Helper for Toast Notifications
         function showToast(message) {
             const toast = document.getElementById('toast-message');
             const toastText = document.getElementById('toast-text');
@@ -601,7 +682,7 @@
 
         // Initial Load Event Listener
         window.addEventListener('DOMContentLoaded', () => {
-            renderTable();
+            initSupabase();
         });
     </script>
 </body>
