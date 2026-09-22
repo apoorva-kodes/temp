@@ -335,7 +335,7 @@
     const SUPABASE_URL = 'https://gnpqjsfxzzfynvrmasve.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_AoRcrgI-0XlyNA6OCxKVXA_PX2Z-MZT';
     
-    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    window._supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // Data Store
     let subscriptions = [];
