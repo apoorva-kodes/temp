@@ -22,6 +22,8 @@ Core Views:
 
 "Add Subscription": Form view featuring user text fields for custom details and a controlled dropdown selector for billing frequencies (e.g., Monthly, Yearly, Weekly, Quarterly).
 
+Analytics & Optimization: Features real-time metric calculation cards (Monthly Expense, Yearly Spend, Active Count, Ending Soon) and an automated Redundancy Alert banner that triggers when managing 3 or more active subscriptions.
+
 Change Log
 
 v1.0.0 — Initial single-file web application structure created with view switching between subscription table and add form.
@@ -30,10 +32,16 @@ v1.1.0 — Removed pre-populated sample data so the application starts completel
 
 v1.2.0 — Updated main app background to pure black (bg-black) and renamed the primary dashboard tab/view from "Looking View" to "My Subscriptions".
 
-v2.0.0 — Backend Integration: Connected the frontend directly to a Supabase PostgreSQL database (`subscriptions` table) via CDN. Replaced local state persistence with live asynchronous database operations (`select`, `insert`, `delete`).
+v2.0.0 — Backend Integration: Connected the frontend directly to a Supabase PostgreSQL database (subscriptions table) via CDN. Replaced local state persistence with live asynchronous database operations (select, insert, delete).
 
-v2.1.0 — Global Client Binding: Attached the Supabase client instance globally to `window._supabase` to allow browser console debugging and testing.
+v2.1.0 — Global Client Binding: Attached the Supabase client instance globally to window._supabase to allow browser console debugging and testing.
 
-v2.2.0 — Database Schema Expansion: Added columns for `next_billing_date`, `is_ending_soon`, `payment_method`, `payment_link`, and `cancellation_url` to match the frontend payload structure.
+v2.2.0 — Database Schema Expansion: Added columns for next_billing_date, is_ending_soon, payment_method, payment_link, and cancellation_url to match the frontend payload structure.
 
-v2.3.0 — Row Level Security (RLS) Configuration: Enabled RLS on the `subscriptions` table and created permissive public policies (`SELECT`, `INSERT`, `DELETE`) for the `anon` role (`USING (true)` / `WITH CHECK (true)`).
+v2.3.0 — Row Level Security (RLS) Configuration: Enabled RLS on the subscriptions table and created permissive public policies (SELECT, INSERT, DELETE) for the anon role (USING (true) / WITH CHECK (true)).
+
+v2.4.0 — Key Metrics & Analytics Dashboard: Integrated key overview cards calculating normalized monthly cost, projected annual spend, active subscription counts, and ending cycle alerts.
+
+v2.5.0 — Real-time Search, Multi-Filter & Sorting System: Added text search across services and payment methods, normalized cost range filtering, and custom sorting (Ending Cycles First, Cost High/Low, Name A-Z).
+
+v2.6.0 — Redundancy Detection & User Experience Enhancements: Added automated savings analysis banner alerts when managing 3+ active services and interactive toast notifications for database operations.

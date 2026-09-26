@@ -35,25 +35,25 @@
     <!-- Top Header Navigation -->
     <header class="bg-zinc-950 border-b border-zinc-800 sticky top-0 z-30 shadow-sm">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16 items-center">
+            <div class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center py-3 sm:py-0 sm:h-16 gap-3 sm:gap-4">
                 <!-- App Brand -->
-                <div class="flex items-center space-x-3">
-                    <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-md shadow-indigo-900/50">
+                <div class="flex items-center space-x-3 shrink-0">
+                    <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold text-lg sm:text-xl shadow-md shadow-indigo-900/50 shrink-0">
                         <i class="fa-solid fa-receipt"></i>
                     </div>
-                    <div>
-                        <h1 class="text-xl font-bold text-white leading-tight">SubTrack</h1>
-                        <p class="text-xs text-zinc-400 font-medium">Subscription & Expense Optimizer</p>
+                    <div class="min-w-0">
+                        <h1 class="text-lg sm:text-xl font-bold text-white leading-tight truncate">SubTrack</h1>
+                        <p class="text-[11px] sm:text-xs text-zinc-400 font-medium truncate">Subscription & Expense Optimizer</p>
                     </div>
                 </div>
 
                 <!-- Navigation Tabs -->
-                <nav class="flex space-x-8" aria-label="Views">
-                    <button id="nav-looking" onclick="switchView('looking')" class="tab-active py-5 px-1 inline-flex items-center text-sm font-medium transition-colors">
-                        <i class="fa-solid fa-list-check mr-2"></i> My Subscriptions
+                <nav class="flex space-x-2 sm:space-x-6 border-t border-zinc-800/80 sm:border-t-0 pt-2.5 sm:pt-0 justify-around sm:justify-end shrink-0" aria-label="Views">
+                    <button id="nav-looking" onclick="switchView('looking')" class="tab-active py-2 sm:py-5 px-2.5 sm:px-3 inline-flex items-center text-xs sm:text-sm font-medium transition-colors">
+                        <i class="fa-solid fa-list-check mr-1.5 sm:mr-2"></i> My Subscriptions
                     </button>
-                    <button id="nav-adding" onclick="switchView('adding')" class="text-zinc-400 hover:text-zinc-200 py-5 px-1 inline-flex items-center text-sm font-medium transition-colors">
-                        <i class="fa-solid fa-plus-circle mr-2"></i> Add Subscription
+                    <button id="nav-adding" onclick="switchView('adding')" class="text-zinc-400 hover:text-zinc-200 py-2 sm:py-5 px-2.5 sm:px-3 inline-flex items-center text-xs sm:text-sm font-medium transition-colors">
+                        <i class="fa-solid fa-plus-circle mr-1.5 sm:mr-2"></i> Add Subscription
                     </button>
                 </nav>
             </div>
@@ -61,60 +61,60 @@
     </header>
 
     <!-- Main Content Area -->
-    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 bg-black">
+    <main class="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-8 bg-black">
         
         <!-- LOOKING VIEW -->
-        <section id="looking-view" class="space-y-6">
+        <section id="looking-view" class="space-y-5 sm:space-y-6">
             
             <!-- Key Metrics Overview Cards -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div class="bg-zinc-900 p-5 rounded-2xl border border-zinc-800 shadow-sm flex items-center justify-between">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                <div class="bg-zinc-900 p-4 sm:p-5 rounded-2xl border border-zinc-800 shadow-sm flex items-center justify-between">
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Monthly Expense</p>
-                        <h3 id="stat-monthly" class="text-2xl font-bold text-white mt-1">$0.00</h3>
-                        <p class="text-xs text-zinc-400 mt-0.5">Normalized monthly total</p>
+                        <h3 id="stat-monthly" class="text-xl sm:text-2xl font-bold text-white mt-1">$0.00</h3>
+                        <p class="text-[11px] sm:text-xs text-zinc-400 mt-0.5">Normalized monthly total</p>
                     </div>
-                    <div class="w-12 h-12 rounded-xl bg-indigo-950 text-indigo-400 border border-indigo-800/40 flex items-center justify-center text-lg font-bold">
+                    <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-indigo-950 text-indigo-400 border border-indigo-800/40 flex items-center justify-center text-base sm:text-lg font-bold shrink-0">
                         <i class="fa-solid fa-calendar-days"></i>
                     </div>
                 </div>
 
-                <div class="bg-zinc-900 p-5 rounded-2xl border border-zinc-800 shadow-sm flex items-center justify-between">
+                <div class="bg-zinc-900 p-4 sm:p-5 rounded-2xl border border-zinc-800 shadow-sm flex items-center justify-between">
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Yearly Spend</p>
-                        <h3 id="stat-yearly" class="text-2xl font-bold text-white mt-1">$0.00</h3>
-                        <p class="text-xs text-zinc-400 mt-0.5">Projected annual cost</p>
+                        <h3 id="stat-yearly" class="text-xl sm:text-2xl font-bold text-white mt-1">$0.00</h3>
+                        <p class="text-[11px] sm:text-xs text-zinc-400 mt-0.5">Projected annual cost</p>
                     </div>
-                    <div class="w-12 h-12 rounded-xl bg-emerald-950 text-emerald-400 border border-emerald-800/40 flex items-center justify-center text-lg font-bold">
+                    <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-emerald-950 text-emerald-400 border border-emerald-800/40 flex items-center justify-center text-base sm:text-lg font-bold shrink-0">
                         <i class="fa-solid fa-chart-line"></i>
                     </div>
                 </div>
 
-                <div class="bg-zinc-900 p-5 rounded-2xl border border-zinc-800 shadow-sm flex items-center justify-between">
+                <div class="bg-zinc-900 p-4 sm:p-5 rounded-2xl border border-zinc-800 shadow-sm flex items-center justify-between">
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Active Services</p>
-                        <h3 id="stat-count" class="text-2xl font-bold text-white mt-1">0</h3>
-                        <p class="text-xs text-zinc-400 mt-0.5">Tracked subscriptions</p>
+                        <h3 id="stat-count" class="text-xl sm:text-2xl font-bold text-white mt-1">0</h3>
+                        <p class="text-[11px] sm:text-xs text-zinc-400 mt-0.5">Tracked subscriptions</p>
                     </div>
-                    <div class="w-12 h-12 rounded-xl bg-blue-950 text-blue-400 border border-blue-800/40 flex items-center justify-center text-lg font-bold">
+                    <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-blue-950 text-blue-400 border border-blue-800/40 flex items-center justify-center text-base sm:text-lg font-bold shrink-0">
                         <i class="fa-solid fa-box-archive"></i>
                     </div>
                 </div>
 
-                <div class="bg-zinc-900 p-5 rounded-2xl border border-zinc-800 shadow-sm flex items-center justify-between">
+                <div class="bg-zinc-900 p-4 sm:p-5 rounded-2xl border border-zinc-800 shadow-sm flex items-center justify-between">
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-wider text-amber-500">Ending Soon</p>
-                        <h3 id="stat-ending" class="text-2xl font-bold text-amber-500 mt-1">0</h3>
-                        <p class="text-xs text-zinc-400 mt-0.5">Renewal cycle expiring</p>
+                        <h3 id="stat-ending" class="text-xl sm:text-2xl font-bold text-amber-500 mt-1">0</h3>
+                        <p class="text-[11px] sm:text-xs text-zinc-400 mt-0.5">Renewal cycle expiring</p>
                     </div>
-                    <div class="w-12 h-12 rounded-xl bg-amber-950 text-amber-400 border border-amber-800/40 flex items-center justify-center text-lg font-bold">
+                    <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-amber-950 text-amber-400 border border-amber-800/40 flex items-center justify-center text-base sm:text-lg font-bold shrink-0">
                         <i class="fa-solid fa-triangle-exclamation"></i>
                     </div>
                 </div>
             </div>
 
             <!-- Controls, Search, and Filters Bar -->
-            <div class="bg-zinc-900 p-4 rounded-2xl border border-zinc-800 shadow-sm flex flex-col lg:flex-row gap-4 justify-between items-stretch lg:items-center">
+            <div class="bg-zinc-900 p-3.5 sm:p-4 rounded-2xl border border-zinc-800 shadow-sm flex flex-col lg:flex-row gap-3 sm:gap-4 justify-between items-stretch lg:items-center">
                 
                 <!-- Search Box -->
                 <div class="relative flex-1">
@@ -123,55 +123,59 @@
                 </div>
 
                 <!-- Filter Dropdowns -->
-                <div class="flex flex-wrap items-center gap-3">
+                <div class="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2.5 sm:gap-3">
                     
-                    <!-- Billing Period Filter -->
-                    <div class="flex items-center space-x-2">
-                        <label for="filter-period" class="text-xs font-semibold text-zinc-400 uppercase">Period:</label>
-                        <select id="filter-period" onchange="applyFilters()" class="bg-zinc-800 border border-zinc-700 text-zinc-200 text-sm rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium">
-                            <option value="ALL">All Periods</option>
-                            <option value="Monthly">Monthly</option>
-                            <option value="Yearly">Yearly</option>
-                            <option value="Quarterly">Quarterly</option>
-                            <option value="Weekly">Weekly</option>
-                        </select>
+                    <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
+                        <!-- Billing Period Filter -->
+                        <div class="flex items-center space-x-2 bg-zinc-800/60 sm:bg-transparent p-1.5 sm:p-0 rounded-xl">
+                            <label for="filter-period" class="text-[11px] sm:text-xs font-semibold text-zinc-400 uppercase pl-1 sm:pl-0">Period:</label>
+                            <select id="filter-period" onchange="applyFilters()" class="w-full sm:w-auto bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs sm:text-sm rounded-xl px-2.5 py-1.5 sm:py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium">
+                                <option value="ALL">All Periods</option>
+                                <option value="Monthly">Monthly</option>
+                                <option value="Yearly">Yearly</option>
+                                <option value="Quarterly">Quarterly</option>
+                                <option value="Weekly">Weekly</option>
+                            </select>
+                        </div>
+
+                        <!-- Billing Cost Range Filter -->
+                        <div class="flex items-center space-x-2 bg-zinc-800/60 sm:bg-transparent p-1.5 sm:p-0 rounded-xl">
+                            <label for="filter-range" class="text-[11px] sm:text-xs font-semibold text-zinc-400 uppercase pl-1 sm:pl-0">Cost:</label>
+                            <select id="filter-range" onchange="applyFilters()" class="w-full sm:w-auto bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs sm:text-sm rounded-xl px-2.5 py-1.5 sm:py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium">
+                                <option value="ALL">All Prices</option>
+                                <option value="0-10">Under $10</option>
+                                <option value="10-50">$10 - $50</option>
+                                <option value="50-100">$50 - $100</option>
+                                <option value="100+">$100+</option>
+                            </select>
+                        </div>
                     </div>
 
-                    <!-- Billing Cost Range Filter -->
-                    <div class="flex items-center space-x-2">
-                        <label for="filter-range" class="text-xs font-semibold text-zinc-400 uppercase">Cost Range:</label>
-                        <select id="filter-range" onchange="applyFilters()" class="bg-zinc-800 border border-zinc-700 text-zinc-200 text-sm rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium">
-                            <option value="ALL">All Prices</option>
-                            <option value="0-10">Under $10</option>
-                            <option value="10-50">$10 - $50</option>
-                            <option value="50-100">$50 - $100</option>
-                            <option value="100+">$100+</option>
-                        </select>
-                    </div>
+                    <div class="flex items-center justify-between sm:justify-start space-x-2 w-full sm:w-auto">
+                        <!-- Sorting Order -->
+                        <div class="flex items-center space-x-2 flex-1 sm:flex-none bg-zinc-800/60 sm:bg-transparent p-1.5 sm:p-0 rounded-xl">
+                            <label for="filter-sort" class="text-[11px] sm:text-xs font-semibold text-zinc-400 uppercase pl-1 sm:pl-0">Sort:</label>
+                            <select id="filter-sort" onchange="applyFilters()" class="w-full sm:w-auto bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs sm:text-sm rounded-xl px-2.5 py-1.5 sm:py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium">
+                                <option value="ENDING_FIRST">Ending Cycles First (!)</option>
+                                <option value="COST_DESC">Cost: High to Low</option>
+                                <option value="COST_ASC">Cost: Low to High</option>
+                                <option value="NAME_ASC">Name: A to Z</option>
+                            </select>
+                        </div>
 
-                    <!-- Sorting Order -->
-                    <div class="flex items-center space-x-2">
-                        <label for="filter-sort" class="text-xs font-semibold text-zinc-400 uppercase">Sort:</label>
-                        <select id="filter-sort" onchange="applyFilters()" class="bg-zinc-800 border border-zinc-700 text-zinc-200 text-sm rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium">
-                            <option value="ENDING_FIRST">Ending Cycles First (!)</option>
-                            <option value="COST_DESC">Cost: High to Low</option>
-                            <option value="COST_ASC">Cost: Low to High</option>
-                            <option value="NAME_ASC">Name: A to Z</option>
-                        </select>
+                        <button onclick="resetFilters()" class="p-2 text-zinc-400 hover:text-zinc-200 rounded-xl hover:bg-zinc-800 border border-zinc-800 sm:border-0 transition-colors shrink-0" title="Reset Filters">
+                            <i class="fa-solid fa-rotate-right"></i>
+                        </button>
                     </div>
-
-                    <button onclick="resetFilters()" class="p-2 text-zinc-400 hover:text-zinc-200 rounded-xl hover:bg-zinc-800 transition-colors" title="Reset Filters">
-                        <i class="fa-solid fa-rotate-right"></i>
-                    </button>
                 </div>
             </div>
 
             <!-- Redundancy & Savings Analysis Banner -->
-            <div id="redundancy-banner" class="hidden bg-amber-950/40 border border-amber-800/50 rounded-2xl p-4 text-amber-200 flex items-start space-x-3 shadow-sm">
+            <div id="redundancy-banner" class="hidden bg-amber-950/40 border border-amber-800/50 rounded-2xl p-3.5 sm:p-4 text-amber-200 flex items-start space-x-3 shadow-sm">
                 <div class="w-8 h-8 rounded-lg bg-amber-900/60 text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
                     <i class="fa-solid fa-lightbulb"></i>
                 </div>
-                <div class="flex-1 text-sm">
+                <div class="flex-1 text-xs sm:text-sm">
                     <h4 class="font-bold text-amber-200">Optimization & Redundancy Alert</h4>
                     <p id="redundancy-text" class="text-amber-300/80 mt-0.5">Review duplicate or high-cost services to eliminate unused expenses.</p>
                 </div>
@@ -180,9 +184,9 @@
             <!-- Subscriptions Table Card -->
             <div class="bg-zinc-900 rounded-2xl border border-zinc-800 shadow-sm overflow-hidden">
                 <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse">
+                    <table class="w-full text-left border-collapse min-w-[700px]">
                         <thead>
-                            <tr class="bg-zinc-950 border-b border-zinc-800 text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                            <tr class="bg-zinc-950 border-b border-zinc-800 text-xs font-semibold text-zinc-400 uppercase tracking-wider whitespace-nowrap">
                                 <th class="py-3.5 px-4 text-center w-12">Status</th>
                                 <th class="py-3.5 px-4">Service Name</th>
                                 <th class="py-3.5 px-4">Billing Period</th>
@@ -200,13 +204,13 @@
                 </div>
 
                 <!-- Empty State Block -->
-                <div id="empty-state" class="py-16 text-center px-4">
-                    <div class="w-16 h-16 rounded-full bg-zinc-800 text-zinc-500 flex items-center justify-center mx-auto mb-4 text-2xl">
+                <div id="empty-state" class="py-12 sm:py-16 text-center px-4">
+                    <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-zinc-800 text-zinc-500 flex items-center justify-center mx-auto mb-4 text-xl sm:text-2xl">
                         <i class="fa-solid fa-folder-open"></i>
                     </div>
                     <h3 class="text-base font-bold text-white">No Subscriptions Found</h3>
-                    <p id="empty-state-subtitle" class="text-sm text-zinc-400 max-w-sm mx-auto mt-1">Your subscription list is currently empty. Add your first service to begin tracking expenses.</p>
-                    <button onclick="switchView('adding')" class="mt-5 inline-flex items-center px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium text-sm transition-colors shadow-sm shadow-indigo-900/50">
+                    <p id="empty-state-subtitle" class="text-xs sm:text-sm text-zinc-400 max-w-sm mx-auto mt-1">Your subscription list is currently empty. Add your first service to begin tracking expenses.</p>
+                    <button onclick="switchView('adding')" class="mt-5 inline-flex items-center px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium text-xs sm:text-sm transition-colors shadow-sm shadow-indigo-900/50">
                         <i class="fa-solid fa-plus mr-2"></i> Add Subscription
                     </button>
                 </div>
@@ -215,14 +219,14 @@
 
         <!-- ADDING VIEW -->
         <section id="adding-view" class="hidden max-w-2xl mx-auto">
-            <div class="bg-zinc-900 p-6 sm:p-8 rounded-2xl border border-zinc-800 shadow-sm">
+            <div class="bg-zinc-900 p-5 sm:p-8 rounded-2xl border border-zinc-800 shadow-sm">
                 
-                <div class="mb-6 pb-6 border-b border-zinc-800">
-                    <h2 class="text-xl font-bold text-white">Add New Subscription</h2>
+                <div class="mb-5 sm:mb-6 pb-5 sm:pb-6 border-b border-zinc-800">
+                    <h2 class="text-lg sm:text-xl font-bold text-white">Add New Subscription</h2>
                     <p class="text-xs text-zinc-400 mt-1">Enter your recurring subscription details accurately to compute uniform expense summaries.</p>
                 </div>
 
-                <form id="add-subscription-form" onsubmit="handleFormSubmit(event)" class="space-y-5">
+                <form id="add-subscription-form" onsubmit="handleFormSubmit(event)" class="space-y-4 sm:space-y-5">
                     
                     <!-- Service Name -->
                     <div>
@@ -301,18 +305,18 @@
 
                     <!-- Cycle Ending Flag Toggle -->
                     <div class="pt-2">
-                        <label class="relative flex items-center space-x-3 cursor-pointer">
-                            <input type="checkbox" id="is_ending_soon" class="w-4 h-4 text-indigo-600 bg-zinc-800 border-zinc-700 rounded focus:ring-indigo-500">
-                            <span class="text-sm font-medium text-zinc-300">Flag as cycle ending / targeted for cancellation (!)</span>
+                        <label class="relative flex items-start space-x-3 cursor-pointer">
+                            <input type="checkbox" id="is_ending_soon" class="mt-0.5 w-4 h-4 text-indigo-600 bg-zinc-800 border-zinc-700 rounded focus:ring-indigo-500">
+                            <span class="text-xs sm:text-sm font-medium text-zinc-300 leading-snug">Flag as cycle ending / targeted for cancellation (!)</span>
                         </label>
                     </div>
 
                     <!-- Submit & Cancel Buttons -->
                     <div class="pt-4 flex items-center justify-end space-x-3">
-                        <button type="button" onclick="switchView('looking')" class="px-5 py-2.5 border border-zinc-700 rounded-xl text-zinc-300 hover:bg-zinc-800 font-medium text-sm transition-colors">
+                        <button type="button" onclick="switchView('looking')" class="px-4 sm:px-5 py-2.5 border border-zinc-700 rounded-xl text-zinc-300 hover:bg-zinc-800 font-medium text-xs sm:text-sm transition-colors">
                             Cancel
                         </button>
-                        <button type="submit" class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium text-sm transition-colors shadow-sm shadow-indigo-900/50">
+                        <button type="submit" class="px-5 sm:px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium text-xs sm:text-sm transition-colors shadow-sm shadow-indigo-900/50">
                             Save Subscription
                         </button>
                     </div>
@@ -323,15 +327,12 @@
     </main>
 
     <!-- Custom Toast Message Notification -->
-    <div id="toast-message" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-zinc-800 border border-zinc-700 text-white px-4 py-3 rounded-xl shadow-lg flex items-center space-x-3 text-sm">
+    <div id="toast-message" class="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-zinc-800 border border-zinc-700 text-white px-4 py-3 rounded-xl shadow-lg flex items-center justify-between sm:justify-start space-x-3 text-xs sm:text-sm">
         <span id="toast-text">Subscription saved!</span>
     </div>
 
-    
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
     // 1. Initialize Supabase Client
-    // Replace these placeholder strings with your actual project credentials from Supabase Settings -> API
     const SUPABASE_URL = 'https://gnpqjsfxzzfynvrmasve.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_AoRcrgI-0XlyNA6OCxKVXA_PX2Z-MZT';
     
@@ -375,17 +376,20 @@
         const navLooking = document.getElementById('nav-looking');
         const navAdding = document.getElementById('nav-adding');
 
+        const activeClass = 'tab-active py-2 sm:py-5 px-2.5 sm:px-3 inline-flex items-center text-xs sm:text-sm font-medium transition-colors';
+        const inactiveClass = 'text-zinc-400 hover:text-zinc-200 py-2 sm:py-5 px-2.5 sm:px-3 inline-flex items-center text-xs sm:text-sm font-medium transition-colors';
+
         if (viewName === 'looking') {
             lookingView.classList.remove('hidden');
             addingView.classList.add('hidden');
-            navLooking.className = 'tab-active py-5 px-1 inline-flex items-center text-sm font-medium transition-colors';
-            navAdding.className = 'text-zinc-400 hover:text-zinc-200 py-5 px-1 inline-flex items-center text-sm font-medium transition-colors';
+            navLooking.className = activeClass;
+            navAdding.className = inactiveClass;
             fetchSubscriptionsFromSupabase();
         } else {
             lookingView.classList.add('hidden');
             addingView.classList.remove('hidden');
-            navAdding.className = 'tab-active py-5 px-1 inline-flex items-center text-sm font-medium transition-colors';
-            navLooking.className = 'text-zinc-400 hover:text-zinc-200 py-5 px-1 inline-flex items-center text-sm font-medium transition-colors';
+            navAdding.className = activeClass;
+            navLooking.className = inactiveClass;
         }
     }
 
@@ -504,28 +508,28 @@
                 const formattedCost = `$${parseFloat(sub.cost).toFixed(2)}`;
                 
                 row.innerHTML = `
-                    <td class="py-4 px-4 text-center font-bold">
+                    <td class="py-3.5 px-4 text-center font-bold">
                         ${sub.isEndingSoon 
-                            ? `<span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-500 text-slate-950 font-bold text-xs shadow-sm" title="Billing cycle ending / priority notice">!</span>` 
+                            ? `<span class="inline-flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-amber-500 text-slate-950 font-bold text-xs shadow-sm" title="Billing cycle ending / priority notice">!</span>` 
                             : `<span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400" title="Active"></span>`}
                     </td>
-                    <td class="py-4 px-4 font-semibold text-white">
+                    <td class="py-3.5 px-4 font-semibold text-white whitespace-nowrap">
                         <div>${escapeHtml(sub.name)}</div>
                         ${sub.isEndingSoon ? `<span class="text-[11px] font-medium text-amber-400">Renewal Cycle Ending</span>` : ''}
                     </td>
-                    <td class="py-4 px-4 text-zinc-300 font-medium">
-                        <span class="inline-block px-2.5 py-1 bg-zinc-800 border border-zinc-700 rounded-lg text-xs font-semibold text-zinc-200">${escapeHtml(sub.billingPeriod)}</span>
+                    <td class="py-3.5 px-4 text-zinc-300 font-medium whitespace-nowrap">
+                        <span class="inline-block px-2.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs font-semibold text-zinc-200">${escapeHtml(sub.billingPeriod)}</span>
                     </td>
-                    <td class="py-4 px-4 text-white font-bold">
+                    <td class="py-3.5 px-4 text-white font-bold whitespace-nowrap">
                         ${formattedCost}
                     </td>
-                    <td class="py-4 px-4 text-zinc-300">
+                    <td class="py-3.5 px-4 text-zinc-300 whitespace-nowrap">
                         ${sub.paymentMethod ? `<span class="text-xs font-medium"><i class="fa-regular fa-credit-card mr-1 text-zinc-500"></i> ${escapeHtml(sub.paymentMethod)}</span>` : '<span class="text-zinc-600">-</span>'}
                     </td>
-                    <td class="py-4 px-4 text-zinc-300 text-xs">
+                    <td class="py-3.5 px-4 text-zinc-300 text-xs whitespace-nowrap">
                         ${sub.nextBillingDate ? escapeHtml(sub.nextBillingDate) : '<span class="text-zinc-600">Not set</span>'}
                     </td>
-                    <td class="py-4 px-4 text-xs space-x-2">
+                    <td class="py-3.5 px-4 text-xs space-x-2 whitespace-nowrap">
                         ${sub.paymentLink 
                             ? `<a href="${escapeHtml(sub.paymentLink)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center text-indigo-400 hover:text-indigo-300 font-medium hover:underline"><i class="fa-solid fa-arrow-up-right-from-square mr-1"></i> Pay</a>` 
                             : '<span class="text-zinc-600">-</span>'}
@@ -533,7 +537,7 @@
                             ? `<a href="${escapeHtml(sub.cancellationUrl)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center text-rose-400 hover:text-rose-300 font-medium hover:underline"><i class="fa-solid fa-ban mr-1"></i> Cancel</a>` 
                             : ''}
                     </td>
-                    <td class="py-4 px-4 text-right space-x-2">
+                    <td class="py-3.5 px-4 text-right space-x-2 whitespace-nowrap">
                         <button onclick="deleteSubscription('${sub.id}')" class="text-zinc-500 hover:text-rose-400 p-1.5 rounded-lg hover:bg-zinc-800 transition-colors" title="Delete subscription">
                             <i class="fa-solid fa-trash-can"></i>
                         </button>
