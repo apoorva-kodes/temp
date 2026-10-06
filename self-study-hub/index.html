@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en" class="dark h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AP Study Resource Hub</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Supabase JS CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-full flex flex-col antialiased selection:bg-indigo-500 selection:text-white">
+
+    <!-- Top Navigation Header -->
+    <header class="sticky top-0 z-40 bg-slate-900/80 backdrop-blur-md border-b border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+            <!-- Brand Logo -->
+            <div class="flex items-center gap-3 cursor-pointer" onclick="switchScreen('feed')">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
+                    <i class="fa-solid fa-graduation-cap text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold bg-gradient-to-r from-white via-slate-200 to-indigo-300 bg-clip-text text-transparent">
+                        AP Study Hub
+                    </h1>
+                    <p class="text-[10px] text-indigo-400 font-medium tracking-wide">PHYSICS • CALC • AP NOTES</p>
+                </div>
+            </div>
+
+            <!-- Navigation Links -->
+            <nav id="main-nav" class="hidden md:flex items-center gap-1.5">
+                <button data-screen="feed" class="nav-btn px-3 py-2 text-xs font-medium rounded-xl border transition-all flex items-center gap-2">
+                    <i class="fa-solid fa-newspaper"></i> Feed
+                </button>
+                <button data-screen="search" class="nav-btn px-3 py-2 text-xs font-medium rounded-xl border transition-all flex items-center gap-2">
+                    <i class="fa-solid fa-magnifying-glass"></i> Search
+                </button>
+                <button data-screen="add-resource" class="nav-btn px-3 py-2 text-xs font-medium rounded-xl border transition-all flex items-center gap-2">
+                    <i class="fa-solid fa-cloud-arrow-up"></i> Upload
+                </button>
+                <button data-screen="settings" class="nav-btn px-3 py-2 text-xs font-medium rounded-xl border transition-all flex items-center gap-2">
+                    <i class="fa-solid fa-gear"></i> Settings
+                </button>
+            </nav>
+
+            <!-- User Status & Sign Out -->
+            <div class="flex items-center gap-3">
+                <span id="nav-user-badge" class="hidden text-xs font-medium bg-indigo-950/80 text-indigo-300 border border-indigo-800/60 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
+                    <i class="fa-solid fa-user-graduate text-indigo-400"></i>
+                    <span>@username</span>
+                </span>
+                <button id="signout-btn" class="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-xl transition-colors" title="Sign Out">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Dynamic Application Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        <!-- SCREEN 1: Authentication View -->
+        <section id="screen-auth" class="app-screen max-w-md mx-auto py-8">
+            <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl">
+                <div class="text-center mb-6">
+                    <div class="w-14 h-14 rounded-2xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center mx-auto mb-3 text-2xl">
+                        <i class="fa-solid fa-lock"></i>
+                    </div>
+                    <h2 id="auth-title" class="text-2xl font-bold text-white mb-1">Sign In to AP Hub</h2>
+                    <p class="text-xs text-slate-400">Access AP Physics C, Calc BC, FRQs & shared student notes</p>
+                </div>
+
+                <!-- GitHub OAuth Button -->
+                <button id="github-signin-btn" type="button" class="w-full py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-100 font-medium text-sm rounded-xl border border-slate-700 transition-all flex items-center justify-center gap-2.5 mb-5 shadow-sm">
+                    <i class="fa-brands fa-github text-lg"></i> Continue with GitHub
+                </button>
+
+                <div class="relative flex py-2 items-center mb-5">
+                    <div class="flex-grow border-t border-slate-800"></div>
+                    <span class="flex-shrink mx-3 text-[11px] text-slate-500 font-semibold uppercase tracking-wider">or email</span>
+                    <div class="flex-grow border-t border-slate-800"></div>
+                </div>
+
+                <!-- Email Form -->
+                <form id="auth-form" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1.5">Email Address</label>
+                        <input type="email" id="auth-email" required placeholder="student@highschool.edu" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1.5">Password</label>
+                        <input type="password" id="auth-password" required placeholder="••••••••" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                    </div>
+
+                    <!-- Password Rules Checklist (Sign Up) -->
+                    <div id="password-rules-box" class="hidden p-3 bg-slate-950/60 rounded-xl border border-slate-800/80 space-y-1">
+                        <p class="text-[11px] font-semibold text-slate-400 mb-1">Password Requirements:</p>
+                        <div id="rule-length" class="text-xs text-slate-400 flex items-center gap-1.5"><i class="fa-regular fa-circle"></i> At least 8 characters</div>
+                        <div id="rule-lower" class="text-xs text-slate-400 flex items-center gap-1.5"><i class="fa-regular fa-circle"></i> At least 1 lowercase letter</div>
+                        <div id="rule-upper" class="text-xs text-slate-400 flex items-center gap-1.5"><i class="fa-regular fa-circle"></i> At least 1 uppercase letter</div>
+                        <div id="rule-number" class="text-xs text-slate-400 flex items-center gap-1.5"><i class="fa-regular fa-circle"></i> At least 1 number</div>
+                    </div>
+
+                    <button id="auth-submit-btn" type="submit" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm rounded-xl transition-all shadow-lg shadow-indigo-600/20">
+                        Sign In
+                    </button>
+                </form>
+
+                <div class="mt-5 text-center">
+                    <a href="#" id="toggle-auth-mode" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium">
+                        Don't have an account? Sign Up
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCREEN 2: Username Setup Screen -->
+        <section id="screen-username-setup" class="app-screen hidden max-w-md mx-auto py-8">
+            <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl">
+                <div class="text-center mb-6">
+                    <div class="w-14 h-14 rounded-2xl bg-violet-600/20 text-violet-400 border border-violet-500/30 flex items-center justify-center mx-auto mb-3 text-2xl">
+                        <i class="fa-solid fa-id-badge"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold text-white mb-1">Choose Username</h2>
+                    <p class="text-xs text-slate-400">Set a unique handle to identify your uploaded notes and resources</p>
+                </div>
+
+                <form id="username-form" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1.5">Username Handle</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-500 text-sm font-semibold">@</span>
+                            <input type="text" id="setup-username-input" required placeholder="mrtortilla" class="w-full pl-8 pr-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                        </div>
+                        <p class="text-[11px] text-slate-500 mt-1">This will be visible to students across the hub.</p>
+                    </div>
+
+                    <button type="submit" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm rounded-xl transition-all shadow-lg shadow-indigo-600/20">
+                        Complete Setup
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        <!-- SCREEN 3: Homepage Main Resource Feed -->
+        <section id="screen-feed" class="app-screen hidden space-y-6">
+            <!-- Feed Header & Search Toolbar -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col md:flex-row items-center justify-between gap-4">
+                <div class="relative w-full md:w-96">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
+                    <input type="text" id="search-query-input" placeholder="Search titles, AP subjects, or tags (#FRQ)..." class="w-full pl-10 pr-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+                </div>
+
+                <div class="flex items-center justify-between w-full md:w-auto gap-4">
+                    <span id="results-count" class="text-xs text-slate-400 font-medium">0 resources available</span>
+                    
+                    <div class="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                        <button id="view-grid-btn" class="p-1.5 text-xs text-indigo-400 hover:bg-slate-800 rounded-lg" title="Grid View">
+                            <i class="fa-solid fa-grip"></i>
+                        </button>
+                        <button id="view-list-btn" class="p-1.5 text-xs text-slate-400 hover:bg-slate-800 rounded-lg" title="List View">
+                            <i class="fa-solid fa-list"></i>
+                        </button>
+                    </div>
+
+                    <button onclick="switchScreen('add-resource')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl transition-all shadow-md shadow-indigo-600/20 flex items-center gap-1.5">
+                        <i class="fa-solid fa-plus"></i> Upload Resource
+                    </button>
+                </div>
+            </div>
+
+            <!-- Feed Content Grid/List -->
+            <div id="resource-feed-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                <!-- Dynamically populated resources -->
+            </div>
+        </section>
+
+        <!-- SCREEN 4: Add Resource View -->
+        <section id="screen-add-resource" class="app-screen hidden max-w-2xl mx-auto py-4">
+            <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl">
+                <div class="flex items-center justify-between mb-6 pb-4 border-b border-slate-800">
+                    <div>
+                        <h2 class="text-xl font-bold text-white">Upload AP Resource</h2>
+                        <p class="text-xs text-slate-400">Share progress checks, FRQ practice, and class notes</p>
+                    </div>
+                    <button onclick="switchScreen('feed')" class="text-slate-400 hover:text-slate-200 text-sm">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+
+                <form id="add-resource-form" class="space-y-5">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1.5">Resource Title *</label>
+                        <input type="text" id="res-title-input" required placeholder="e.g., AP Physics C Gauss Law Progress Check Solution" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-indigo-500">
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-300 mb-1.5">AP Subject *</label>
+                            <select id="res-subject-select" required class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-indigo-500">
+                                <!-- Options populated by app.js -->
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-slate-300 mb-1.5">Tags (Comma Separated)</label>
+                            <input type="text" id="res-tags-input" placeholder="e.g. FRQ, Gauss Law, Notes" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-indigo-500">
+                        </div>
+                    </div>
+
+                    <!-- File Upload Input Zone -->
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1.5">Attach File (Max 25 MB) *</label>
+                        <div class="relative border-2 border-dashed border-slate-700 hover:border-indigo-500/60 rounded-2xl p-6 text-center bg-slate-950/50 transition-colors">
+                            <input type="file" id="res-file-input" required accept=".pdf,.png,.jpg,.jpeg,.docx,.txt" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="document.getElementById('selected-file-name').textContent = this.files[0] ? this.files[0].name : 'No file chosen'">
+                            <div class="space-y-2">
+                                <i class="fa-solid fa-cloud-arrow-up text-3xl text-indigo-400"></i>
+                                <p class="text-xs text-slate-300 font-medium">Click or drag file to upload</p>
+                                <p class="text-[11px] text-slate-500">Allowed formats: .pdf, .png, .jpg, .docx, .txt (Limit: 25 MB)</p>
+                                <p id="selected-file-name" class="text-xs font-semibold text-indigo-300 pt-2">No file chosen</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-2 flex justify-end gap-3">
+                        <button type="button" onclick="switchScreen('feed')" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">
+                            Cancel
+                        </button>
+                        <button type="submit" class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl shadow-lg shadow-indigo-600/20">
+                            Publish Resource
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- SCREEN 5: Search & Filtering Hub -->
+        <section id="screen-search" class="app-screen hidden space-y-6">
+            <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8">
+                <h2 class="text-xl font-bold text-white mb-2">Subject Search & Filter Hub</h2>
+                <p class="text-xs text-slate-400 mb-6">Filter AP study materials by target class or tag</p>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">AP Subjects</label>
+                        <div id="subject-pills-container" class="flex flex-wrap gap-2">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCREEN 6: Account Settings & Password Change -->
+        <section id="screen-settings" class="app-screen hidden max-w-xl mx-auto py-4">
+            <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6">
+                <div>
+                    <h2 class="text-xl font-bold text-white mb-1">Account Settings</h2>
+                    <p class="text-xs text-slate-400">Manage your profile and security parameters</p>
+                </div>
+
+                <div class="p-4 bg-slate-950 border border-slate-800 rounded-2xl flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-slate-400 mb-0.5">Signed in as</p>
+                        <p id="settings-user-email" class="text-sm font-semibold text-slate-200">student@school.edu</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xs text-slate-400 mb-0.5">Username</p>
+                        <p id="settings-username" class="text-sm font-semibold text-indigo-400">@username</p>
+                    </div>
+                </div>
+
+                <!-- Change Password Form -->
+                <form id="change-password-form" class="space-y-4 border-t border-slate-800 pt-5">
+                    <h3 class="text-sm font-semibold text-slate-200">Change Password</h3>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1.5">New Password</label>
+                        <input type="password" id="new-password-input" required placeholder="••••••••" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-indigo-500">
+                        <p class="text-[11px] text-slate-500 mt-1">Must be 8+ characters with uppercase, lowercase & number.</p>
+                    </div>
+                    <button type="submit" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl shadow-md shadow-indigo-600/20">
+                        Update Password
+                    </button>
+                </form>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Modal: Confirmation Dialog -->
+    <div id="confirm-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl">
+            <div class="w-12 h-12 rounded-xl bg-rose-950/60 border border-rose-800/60 text-rose-400 flex items-center justify-center text-xl mx-auto">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div class="text-center">
+                <h3 class="text-base font-bold text-slate-100">Delete Resource?</h3>
+                <p class="text-xs text-slate-400 mt-1">This operation cannot be undone. Are you sure you want to delete this resource?</p>
+            </div>
+            <div class="flex gap-2.5 pt-2">
+                <button id="cancel-action-btn" class="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">
+                    Cancel
+                </button>
+                <button id="confirm-action-btn" class="flex-1 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold rounded-xl">
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: File Preview Dialog -->
+    <div id="preview-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl">
+            <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
+                <h3 id="preview-title" class="text-base font-bold text-slate-100 truncate">Resource Preview</h3>
+                <button onclick="closePreviewModal()" class="text-slate-400 hover:text-slate-200">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div id="preview-body" class="flex-1 overflow-auto">
+                <!-- Preview Content -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications Container -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2.5"></div>
+
+    <!-- Global Loading Overlay -->
+    <div id="loading-overlay" class="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex flex-col items-center justify-center gap-3 hidden">
+        <div class="w-10 h-10 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin"></div>
+        <p id="loading-text" class="text-xs font-medium text-slate-300">Processing...</p>
+    </div>
+
+    <!-- Load Application Logic after Configuration -->
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
