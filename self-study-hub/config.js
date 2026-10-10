@@ -3,5 +3,5 @@
  * Contains project URL and publishable key for Supabase integration.
  */
 
-window.SUPABASE_URL = "https://your-supabase-project.supabase.co";
-window.SUPABASE_ANON_KEY = "sb_publishable_your_key_here";
+window.SUPABASE_URL = "https://ayuxmdwiborsrivozcru.supabase.co";
+window.SUPABASE_ANON_KEY = "sb_publishable__Oi3ky4z6KvP1JA68sIjpw_AJ1zRWWb";

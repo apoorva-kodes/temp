@@ -35,7 +35,6 @@
         body {
             font-family: 'Inter', sans-serif;
         }
-        /* Custom scrollbar styling */
         ::-webkit-scrollbar {
             width: 8px;
             height: 8px;
@@ -86,11 +85,11 @@
                 </button>
             </nav>
 
-            <!-- User Status & Sign Out -->
-            <div class="flex items-center gap-3">
-                <span id="nav-user-badge" class="hidden text-xs font-medium bg-indigo-950/80 text-indigo-300 border border-indigo-800/60 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
+            <!-- User Status Display & Sign Out -->
+            <div id="user-nav-section" class="hidden items-center gap-3">
+                <span id="nav-user-badge" class="text-xs font-medium bg-indigo-950/80 text-indigo-300 border border-indigo-800/60 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
                     <i class="fa-solid fa-user-graduate text-indigo-400"></i>
-                    <span>@username</span>
+                    <span id="user-email-display">user@example.com</span>
                 </span>
                 <button id="signout-btn" class="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-xl transition-colors" title="Sign Out">
                     <i class="fa-solid fa-right-from-bracket"></i>
@@ -99,7 +98,7 @@
         </div>
     </header>
 
-    <!-- Main Dynamic Application Container -->
+    <!-- Main Application Container -->
     <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
         <!-- SCREEN 1: Authentication View -->
@@ -113,15 +112,10 @@
                     <p class="text-xs text-slate-400">Access AP Physics C, Calc BC, FRQs & shared student notes</p>
                 </div>
 
-                <!-- GitHub OAuth Button -->
-                <button id="github-signin-btn" type="button" class="w-full py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-100 font-medium text-sm rounded-xl border border-slate-700 transition-all flex items-center justify-center gap-2.5 mb-5 shadow-sm">
-                    <i class="fa-brands fa-github text-lg"></i> Continue with GitHub
-                </button>
-
-                <div class="relative flex py-2 items-center mb-5">
-                    <div class="flex-grow border-t border-slate-800"></div>
-                    <span class="flex-shrink mx-3 text-[11px] text-slate-500 font-semibold uppercase tracking-wider">or email</span>
-                    <div class="flex-grow border-t border-slate-800"></div>
+                <!-- Error Messages Box -->
+                <div id="auth-error-msg" class="hidden mb-4 p-3.5 bg-rose-950/80 border border-rose-700/80 text-rose-200 text-xs rounded-xl flex items-start gap-2.5">
+                    <i class="fa-solid fa-circle-exclamation text-rose-400 text-base shrink-0 mt-0.5"></i>
+                    <span id="auth-error-text">An error occurred.</span>
                 </div>
 
                 <!-- Email Form -->
@@ -136,7 +130,7 @@
                         <input type="password" id="auth-password" required placeholder="••••••••" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
                     </div>
 
-                    <!-- Password Rules Checklist (Sign Up) -->
+                    <!-- Password Requirements (Visible during Sign Up) -->
                     <div id="password-rules-box" class="hidden p-3 bg-slate-950/60 rounded-xl border border-slate-800/80 space-y-1">
                         <p class="text-[11px] font-semibold text-slate-400 mb-1">Password Requirements:</p>
                         <div id="rule-length" class="text-xs text-slate-400 flex items-center gap-1.5"><i class="fa-regular fa-circle"></i> At least 8 characters</div>
@@ -145,15 +139,19 @@
                         <div id="rule-number" class="text-xs text-slate-400 flex items-center gap-1.5"><i class="fa-regular fa-circle"></i> At least 1 number</div>
                     </div>
 
-                    <button id="auth-submit-btn" type="submit" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm rounded-xl transition-all shadow-lg shadow-indigo-600/20">
-                        Sign In
-                    </button>
+                    <div class="flex gap-3 pt-1">
+                        <button id="signin-btn" type="button" class="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm rounded-xl transition-all shadow-lg shadow-indigo-600/20">
+                            Sign In
+                        </button>
+                        <button id="signup-btn" type="button" class="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-sm rounded-xl transition-all border border-slate-700">
+                            Sign Up
+                        </button>
+                    </div>
                 </form>
 
-                <div class="mt-5 text-center">
-                    <a href="#" id="toggle-auth-mode" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium">
-                        Don't have an account? Sign Up
-                    </a>
+                <!-- Reserved Slot for GitHub Sign-In -->
+                <div class="mt-6 pt-5 border-t border-slate-800/80">
+                    <!-- Reserved: Sign in with GitHub button will go here -->
                 </div>
             </div>
         </section>
@@ -188,7 +186,6 @@
 
         <!-- SCREEN 3: Homepage Main Resource Feed -->
         <section id="screen-feed" class="app-screen hidden space-y-6">
-            <!-- Feed Header & Search Toolbar -->
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col md:flex-row items-center justify-between gap-4">
                 <div class="relative w-full md:w-96">
                     <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
@@ -213,7 +210,6 @@
                 </div>
             </div>
 
-            <!-- Feed Content Grid/List -->
             <div id="resource-feed-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 <!-- Dynamically populated resources -->
             </div>
@@ -242,7 +238,6 @@
                         <div>
                             <label class="block text-xs font-medium text-slate-300 mb-1.5">AP Subject *</label>
                             <select id="res-subject-select" required class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-indigo-500">
-                                <!-- Options populated by app.js -->
                             </select>
                         </div>
 
@@ -252,7 +247,6 @@
                         </div>
                     </div>
 
-                    <!-- File Upload Input Zone -->
                     <div>
                         <label class="block text-xs font-medium text-slate-300 mb-1.5">Attach File (Max 25 MB) *</label>
                         <div class="relative border-2 border-dashed border-slate-700 hover:border-indigo-500/60 rounded-2xl p-6 text-center bg-slate-950/50 transition-colors">
@@ -288,7 +282,6 @@
                     <div>
                         <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">AP Subjects</label>
                         <div id="subject-pills-container" class="flex flex-wrap gap-2">
-                            <!-- Populated dynamically -->
                         </div>
                     </div>
                 </div>
@@ -331,7 +324,7 @@
 
     </main>
 
-    <!-- Modal: Confirmation Dialog -->
+    <!-- Confirm Modal -->
     <div id="confirm-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl">
             <div class="w-12 h-12 rounded-xl bg-rose-950/60 border border-rose-800/60 text-rose-400 flex items-center justify-center text-xl mx-auto">
@@ -352,7 +345,7 @@
         </div>
     </div>
 
-    <!-- Modal: File Preview Dialog -->
+    <!-- Preview Modal -->
     <div id="preview-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
         <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl">
             <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
@@ -362,7 +355,6 @@
                 </button>
             </div>
             <div id="preview-body" class="flex-1 overflow-auto">
-                <!-- Preview Content -->
             </div>
         </div>
     </div>
@@ -376,7 +368,6 @@
         <p id="loading-text" class="text-xs font-medium text-slate-300">Processing...</p>
     </div>
 
-    <!-- Load Application Logic after Configuration -->
     <script src="config.js"></script>
     <script src="app.js"></script>
 </body>

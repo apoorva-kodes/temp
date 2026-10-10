@@ -15,7 +15,7 @@ const state = {
     selectedSubject: 'ALL',
     selectedTag: 'ALL',
     viewMode: 'grid',       // 'grid' or 'list'
-    isDemoMode: false,      // True if Supabase keys are not yet configured
+    isDemoMode: false,      // True if Supabase keys are not configured
     demoResources: []       // Fallback local storage state
 };
 
@@ -49,27 +49,21 @@ function initSupabaseClient() {
     const url = window.SUPABASE_URL;
     const key = window.SUPABASE_ANON_KEY;
 
-    // Detect if valid credentials exist
     if (url && key && url.includes('supabase.co') && !url.includes('your-supabase-project')) {
         try {
             state.supabase = window.supabase.createClient(url, key);
             state.isDemoMode = false;
-            console.log('Connected to Supabase production environment.');
         } catch (err) {
-            console.warn('Failed to initialize Supabase client, enabling interactive preview mode:', err);
+            console.warn('Failed to initialize Supabase client:', err);
             enableDemoMode();
         }
     } else {
-        console.info('Supabase URL/Key placeholders detected. Running in interactive demo mode with persistent local state.');
         enableDemoMode();
     }
 }
 
 function enableDemoMode() {
     state.isDemoMode = true;
-    showToast('Operating in Interactive Preview Mode. Add your Supabase keys to config.js to connect live database.', 'info');
-    
-    // Seed sample resources for preview
     const localSaved = localStorage.getItem('ap_hub_demo_resources');
     if (localSaved) {
         try {
@@ -95,28 +89,6 @@ function getDefaultDemoResources() {
             file_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
             file_name: 'Gauss_Law_FRQ_Solutions.pdf',
             created_at: new Date(Date.now() - 3600000 * 24 * 2).toISOString()
-        },
-        {
-            id: 'res-2',
-            user_id: 'user-tortilla',
-            username: 'Mr. Tortilla',
-            title: 'Rotational Dynamics Cheat Sheet & Torque Formula Breakdown',
-            subject: 'AP Physics C: Mechanics',
-            tags: ['Notes', 'Formula Sheet', 'Rotational Motion'],
-            file_url: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=800',
-            file_name: 'Rotational_Dynamics_Summary.jpg',
-            created_at: new Date(Date.now() - 3600000 * 12).toISOString()
-        },
-        {
-            id: 'res-3',
-            user_id: 'user-sargus',
-            username: 'Mr. Sargus',
-            title: 'AP Calculus BC Integration by Parts & Taylor Series Review',
-            subject: 'AP Calculus BC',
-            tags: ['Practice Problems', 'Taylor Series', 'Calculus'],
-            file_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
-            file_name: 'Taylor_Series_Practice.pdf',
-            created_at: new Date(Date.now() - 3600000 * 48).toISOString()
         }
     ];
 }
@@ -127,18 +99,13 @@ function saveDemoResources() {
 
 async function checkInitialSession() {
     if (state.isDemoMode) {
-        // Check local demo user session
         const demoUser = localStorage.getItem('ap_hub_demo_user');
         if (demoUser) {
             const userObj = JSON.parse(demoUser);
             state.currentUser = userObj;
             state.currentProfile = { username: userObj.username || userObj.email.split('@')[0] };
-            if (!state.currentProfile.username) {
-                switchScreen('username-setup');
-            } else {
-                switchScreen('feed');
-                await loadResources();
-            }
+            switchScreen('feed');
+            await loadResources();
         } else {
             switchScreen('auth');
         }
@@ -146,19 +113,11 @@ async function checkInitialSession() {
         return;
     }
 
-    // Live Supabase Auth Session
-    const { data: { session } } = await state.supabase.auth.getSession();
-    if (session) {
-        state.currentUser = session.user;
-        await fetchUserProfile(session.user.id);
-    } else {
-        switchScreen('auth');
-    }
-
-    // Listen for Auth changes
+    // Set up auth state change listener
     state.supabase.auth.onAuthStateChange(async (event, session) => {
-        if (session) {
+        if (session && session.user) {
             state.currentUser = session.user;
+            updateNavUI();
             await fetchUserProfile(session.user.id);
         } else {
             state.currentUser = null;
@@ -167,6 +126,12 @@ async function checkInitialSession() {
             updateNavUI();
         }
     });
+
+    // Check current session
+    const { data: { session } } = await state.supabase.auth.getSession();
+    if (!session) {
+        switchScreen('auth');
+    }
 }
 
 async function fetchUserProfile(userId) {
@@ -179,10 +144,6 @@ async function fetchUserProfile(userId) {
             .eq('id', userId)
             .single();
 
-        if (error && error.code !== 'PGRST116') {
-            console.error('Error fetching profile:', error);
-        }
-
         if (data && data.username) {
             state.currentProfile = data;
             if (state.activeScreen === 'auth' || state.activeScreen === 'username-setup') {
@@ -190,11 +151,9 @@ async function fetchUserProfile(userId) {
                 await loadResources();
             }
         } else {
-            // First time sign in without username setup
             switchScreen('username-setup');
         }
     } catch (e) {
-        console.error('Unexpected profile fetch error:', e);
         switchScreen('username-setup');
     }
     updateNavUI();
@@ -235,10 +194,31 @@ function updatePasswordStrengthUI(password) {
     setRule('rule-number', v.hasNumber);
 }
 
+function displayAuthError(message) {
+    const box = document.getElementById('auth-error-msg');
+    const text = document.getElementById('auth-error-text');
+    if (box && text) {
+        text.textContent = message;
+        box.classList.remove('hidden');
+    }
+}
+
+function clearAuthError() {
+    const box = document.getElementById('auth-error-msg');
+    if (box) box.classList.add('hidden');
+}
+
 async function handleSignUp(email, password) {
+    clearAuthError();
+
+    if (!email || !password) {
+        displayAuthError('Please fill in both email and password.');
+        return;
+    }
+
     const passwordCheck = validatePassword(password);
     if (!passwordCheck.isValid) {
-        showToast('Password does not meet required security criteria.', 'error');
+        displayAuthError('Password must be at least 8 characters long and contain uppercase, lowercase, and numbers.');
         return;
     }
 
@@ -246,7 +226,7 @@ async function handleSignUp(email, password) {
         const newUser = { id: 'user-' + Date.now(), email: email, username: '' };
         state.currentUser = newUser;
         localStorage.setItem('ap_hub_demo_user', JSON.stringify(newUser));
-        showToast('Account created successfully (Demo Mode)!', 'success');
+        showToast('Account created (Demo Mode)!', 'success');
         switchScreen('username-setup');
         updateNavUI();
         return;
@@ -259,21 +239,35 @@ async function handleSignUp(email, password) {
             password: password
         });
 
-        if (error) throw error;
+        if (error) {
+            if (error.message.includes('already registered')) {
+                displayAuthError('An account with this email address already exists.');
+            } else {
+                displayAuthError(error.message);
+            }
+            return;
+        }
 
-        showToast('Registration successful! Please complete username setup.', 'success');
+        showToast('Account created successfully!', 'success');
         if (data.user) {
             state.currentUser = data.user;
             switchScreen('username-setup');
         }
     } catch (error) {
-        showToast(error.message || 'Error signing up.', 'error');
+        displayAuthError(error.message || 'Error signing up.');
     } finally {
         showLoading(false);
     }
 }
 
 async function handleSignIn(email, password) {
+    clearAuthError();
+
+    if (!email || !password) {
+        displayAuthError('Please fill in both email and password.');
+        return;
+    }
+
     if (state.isDemoMode) {
         const savedUser = localStorage.getItem('ap_hub_demo_user');
         let userObj = savedUser ? JSON.parse(savedUser) : { id: 'user-demo', email: email, username: email.split('@')[0] };
@@ -282,12 +276,8 @@ async function handleSignIn(email, password) {
         localStorage.setItem('ap_hub_demo_user', JSON.stringify(userObj));
         showToast('Signed in successfully!', 'success');
         
-        if (!userObj.username) {
-            switchScreen('username-setup');
-        } else {
-            switchScreen('feed');
-            await loadResources();
-        }
+        switchScreen('feed');
+        await loadResources();
         updateNavUI();
         return;
     }
@@ -299,38 +289,22 @@ async function handleSignIn(email, password) {
             password: password
         });
 
-        if (error) throw error;
+        if (error) {
+            if (error.message.includes('Invalid login credentials')) {
+                displayAuthError('Incorrect email or password. Please try again.');
+            } else {
+                displayAuthError(error.message);
+            }
+            return;
+        }
 
         showToast('Welcome back!', 'success');
         state.currentUser = data.user;
         await fetchUserProfile(data.user.id);
     } catch (error) {
-        showToast(error.message || 'Invalid login credentials.', 'error');
+        displayAuthError(error.message || 'Invalid login credentials.');
     } finally {
         showLoading(false);
-    }
-}
-
-async function handleGitHubSignIn() {
-    if (state.isDemoMode) {
-        const githubUser = { id: 'user-github', email: 'student@github.com', username: 'GitHubStudent' };
-        state.currentUser = githubUser;
-        state.currentProfile = { username: githubUser.username };
-        localStorage.setItem('ap_hub_demo_user', JSON.stringify(githubUser));
-        showToast('Signed in via GitHub (Demo Mode)!', 'success');
-        switchScreen('feed');
-        await loadResources();
-        updateNavUI();
-        return;
-    }
-
-    try {
-        const { error } = await state.supabase.auth.signInWithOAuth({
-            provider: 'github'
-        });
-        if (error) throw error;
-    } catch (error) {
-        showToast(error.message || 'GitHub OAuth failed.', 'error');
     }
 }
 
@@ -379,7 +353,6 @@ async function handleUsernameSetup(username) {
 
     try {
         showLoading(true);
-        // Check uniqueness
         const { data: existing } = await state.supabase
             .from('profiles')
             .select('id')
@@ -391,7 +364,6 @@ async function handleUsernameSetup(username) {
             return;
         }
 
-        // Upsert profile
         const { error } = await state.supabase
             .from('profiles')
             .upsert({
@@ -423,7 +395,6 @@ async function loadResources() {
 
     try {
         showLoading(true);
-        // Fetch resources and profile usernames
         const { data: resourcesData, error: resError } = await state.supabase
             .from('resources')
             .select('*')
@@ -431,11 +402,9 @@ async function loadResources() {
 
         if (resError) throw resError;
 
-        const { data: profilesData, error: profError } = await state.supabase
+        const { data: profilesData } = await state.supabase
             .from('profiles')
             .select('id, username');
-
-        if (profError) console.warn('Could not load profile names:', profError);
 
         const profileMap = {};
         if (profilesData) {
@@ -450,8 +419,7 @@ async function loadResources() {
 
         renderResourceFeed();
     } catch (error) {
-        console.error('Error loading resources:', error);
-        showToast('Failed to load resources from Supabase.', 'error');
+        showToast('Failed to load resources.', 'error');
     } finally {
         showLoading(false);
     }
@@ -463,16 +431,14 @@ async function handleResourceUpload({ title, subject, tags, file }) {
         return;
     }
 
-    // Validate file extension
     const ext = '.' + file.name.split('.').pop().toLowerCase();
     if (!ALLOWED_EXTENSIONS.includes(ext)) {
         showToast(`Invalid file format. Allowed: ${ALLOWED_EXTENSIONS.join(', ')}`, 'error');
         return;
     }
 
-    // Validate file size (25MB)
     if (file.size > MAX_FILE_SIZE_BYTES) {
-        showToast('File size exceeds the maximum limit of 25 MB.', 'error');
+        showToast('File size exceeds 25 MB.', 'error');
         return;
     }
 
@@ -481,7 +447,6 @@ async function handleResourceUpload({ title, subject, tags, file }) {
         .filter(t => t.length > 0);
 
     if (state.isDemoMode) {
-        const fileUrl = URL.createObjectURL(file);
         const newRes = {
             id: 'res-' + Date.now(),
             user_id: state.currentUser ? state.currentUser.id : 'user-demo',
@@ -489,7 +454,7 @@ async function handleResourceUpload({ title, subject, tags, file }) {
             title: title.trim(),
             subject: subject,
             tags: parsedTags.length > 0 ? parsedTags : ['AP Prep'],
-            file_url: fileUrl,
+            file_url: URL.createObjectURL(file),
             file_name: file.name,
             created_at: new Date().toISOString()
         };
@@ -506,26 +471,23 @@ async function handleResourceUpload({ title, subject, tags, file }) {
     }
 
     try {
-        showLoading(true, 'Uploading file to AP storage bucket...');
+        showLoading(true, 'Uploading file...');
 
-        // 1. Storage Upload to 'ap-resources' bucket
         const fileExt = file.name.split('.').pop();
         const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
         const filePath = `${state.currentUser.id}/${fileName}`;
 
-        const { data: storageData, error: storageError } = await state.supabase.storage
+        const { error: storageError } = await state.supabase.storage
             .from('ap-resources')
             .upload(filePath, file);
 
         if (storageError) throw storageError;
 
-        // Get public URL
         const { data: { publicUrl } } = state.supabase.storage
             .from('ap-resources')
             .getPublicUrl(filePath);
 
-        // 2. Insert metadata row into `resources` table
-        const { data: dbData, error: dbError } = await state.supabase
+        const { error: dbError } = await state.supabase
             .from('resources')
             .insert({
                 user_id: state.currentUser.id,
@@ -535,9 +497,7 @@ async function handleResourceUpload({ title, subject, tags, file }) {
                 file_url: publicUrl,
                 file_name: file.name,
                 created_at: new Date().toISOString()
-            })
-            .select()
-            .single();
+            });
 
         if (dbError) throw dbError;
 
@@ -546,7 +506,6 @@ async function handleResourceUpload({ title, subject, tags, file }) {
         switchScreen('feed');
         await loadResources();
     } catch (error) {
-        console.error('Upload failed:', error);
         showToast(error.message || 'Error uploading resource.', 'error');
     } finally {
         showLoading(false);
@@ -554,9 +513,6 @@ async function handleResourceUpload({ title, subject, tags, file }) {
 }
 
 async function handleDeleteResource(resourceId) {
-    const res = state.resources.find(r => r.id === resourceId);
-    if (!res) return;
-
     if (state.isDemoMode) {
         state.demoResources = state.demoResources.filter(r => r.id !== resourceId);
         saveDemoResources();
@@ -568,13 +524,11 @@ async function handleDeleteResource(resourceId) {
 
     try {
         showLoading(true, 'Deleting resource...');
-        
-        // Delete database row
         const { error: dbError } = await state.supabase
             .from('resources')
             .delete()
             .eq('id', resourceId)
-            .eq('user_id', state.currentUser.id); // Security restriction
+            .eq('user_id', state.currentUser.id);
 
         if (dbError) throw dbError;
 
@@ -602,10 +556,7 @@ async function handlePasswordChange(newPassword) {
 
     try {
         showLoading(true);
-        const { error } = await state.supabase.auth.updateUser({
-            password: newPassword
-        });
-
+        const { error } = await state.supabase.auth.updateUser({ password: newPassword });
         if (error) throw error;
 
         showToast('Password updated successfully!', 'success');
@@ -619,7 +570,6 @@ async function handlePasswordChange(newPassword) {
 
 function getFilteredResources() {
     return state.resources.filter(res => {
-        // Query match
         const q = state.searchQuery.toLowerCase().trim();
         const titleMatch = res.title ? res.title.toLowerCase().includes(q) : false;
         const subjectMatch = res.subject ? res.subject.toLowerCase().includes(q) : false;
@@ -627,10 +577,7 @@ function getFilteredResources() {
         const userMatch = res.username ? res.username.toLowerCase().includes(q) : false;
         const matchesQuery = !q || titleMatch || subjectMatch || tagMatch || userMatch;
 
-        // Subject filter
         const matchesSubject = state.selectedSubject === 'ALL' || res.subject === state.selectedSubject;
-
-        // Tag filter
         const matchesTag = state.selectedTag === 'ALL' || (res.tags && res.tags.includes(state.selectedTag));
 
         return matchesQuery && matchesSubject && matchesTag;
@@ -656,9 +603,7 @@ function renderResourceFeed() {
                 </div>
                 <h3 class="text-xl font-semibold text-slate-200 mb-1">No AP Resources Found</h3>
                 <p class="text-slate-400 max-w-md mx-auto text-sm mb-6">
-                    ${state.searchQuery || state.selectedSubject !== 'ALL' || state.selectedTag !== 'ALL'
-                        ? 'Try clearing your active search filters or selecting a different subject.'
-                        : 'Be the first high school student to contribute AP Physics, Calculus, or Chemistry notes!'}
+                    Try clearing your active search filters or selecting a different subject.
                 </p>
                 <button onclick="switchScreen('add-resource')" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-medium transition-all duration-200 inline-flex items-center gap-2 shadow-lg shadow-indigo-600/20">
                     <i class="fa-solid fa-plus"></i> Upload First Resource
@@ -685,46 +630,6 @@ function renderResourceFeed() {
 
         const formattedDate = item.created_at ? new Date(item.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently';
 
-        if (state.viewMode === 'list') {
-            return `
-                <div class="bg-slate-800/60 border border-slate-700/60 hover:border-indigo-500/50 rounded-xl p-4 transition-all duration-200 flex flex-col md:flex-row md:items-center justify-between gap-4 group">
-                    <div class="flex items-start gap-3.5 min-w-0">
-                        <div class="w-10 h-10 rounded-lg bg-slate-700/60 flex items-center justify-center text-xl shrink-0 group-hover:scale-105 transition-transform">
-                            <i class="fa-solid ${iconClass}"></i>
-                        </div>
-                        <div class="min-w-0">
-                            <h4 class="text-base font-medium text-slate-100 group-hover:text-indigo-300 transition-colors truncate mb-1">
-                                ${escapeHTML(item.title)}
-                            </h4>
-                            <div class="flex flex-wrap items-center gap-2 text-xs text-slate-400">
-                                <span class="bg-indigo-950/80 text-indigo-300 border border-indigo-800/50 px-2 py-0.5 rounded-md font-medium">
-                                    ${escapeHTML(item.subject)}
-                                </span>
-                                <span>•</span>
-                                <span>by <strong class="text-slate-300">@${escapeHTML(item.username)}</strong></span>
-                                <span>•</span>
-                                <span>${formattedDate}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="flex items-center gap-2 shrink-0 self-end md:self-auto">
-                        <button onclick="previewFile('${escapeHTML(item.file_url)}', '${escapeHTML(item.title)}', '${fileExt}')" class="px-3 py-1.5 text-xs bg-slate-700/70 hover:bg-slate-600 text-slate-200 rounded-lg transition-colors flex items-center gap-1.5">
-                            <i class="fa-solid fa-eye"></i> View
-                        </button>
-                        <a href="${escapeHTML(item.file_url)}" download="${escapeHTML(item.file_name)}" target="_blank" class="px-3 py-1.5 text-xs bg-indigo-600/80 hover:bg-indigo-600 text-white rounded-lg transition-colors flex items-center gap-1.5">
-                            <i class="fa-solid fa-download"></i> Download
-                        </a>
-                        ${isOwner ? `
-                            <button onclick="confirmDeleteResource('${item.id}')" class="p-1.5 text-xs bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-800/40 rounded-lg transition-colors" title="Delete Resource">
-                                <i class="fa-solid fa-trash-can"></i>
-                            </button>
-                        ` : ''}
-                    </div>
-                </div>
-            `;
-        }
-
         return `
             <div class="bg-slate-800/60 border border-slate-700/60 hover:border-indigo-500/50 rounded-2xl p-5 transition-all duration-200 flex flex-col justify-between group hover:shadow-xl hover:shadow-indigo-950/20">
                 <div>
@@ -743,8 +648,8 @@ function renderResourceFeed() {
 
                     <div class="flex flex-wrap gap-1.5 mb-4">
                         ${(item.tags || []).map(tag => `
-                            <span onclick="filterByTag('${escapeHTML(tag)}')" class="cursor-pointer text-[11px] bg-slate-700/40 hover:bg-slate-700 text-slate-300 px-2 py-0.5 rounded-md transition-colors">
-                                #${escapeHTML(tag)}
+                            <span onclick="filterByTag('\${escapeHTML(tag)}')" class="cursor-pointer text-[11px] bg-slate-700/40 hover:bg-slate-700 text-slate-300 px-2 py-0.5 rounded-md transition-colors">
+                                #\${escapeHTML(tag)}
                             </span>
                         `).join('')}
                     </div>
@@ -766,7 +671,7 @@ function renderResourceFeed() {
                             <i class="fa-solid fa-download"></i>
                         </a>
                         ${isOwner ? `
-                            <button onclick="confirmDeleteResource('${item.id}')" class="p-1.5 bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-800/40 rounded-lg transition-colors" title="Delete">
+                            <button onclick="confirmDeleteResource('\${item.id}')" class="p-1.5 bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-800/40 rounded-lg transition-colors" title="Delete">
                                 <i class="fa-solid fa-trash-can"></i>
                             </button>
                         ` : ''}
@@ -780,57 +685,37 @@ function renderResourceFeed() {
 function switchScreen(screenName) {
     state.activeScreen = screenName;
 
-    // Hide all screen containers
     document.querySelectorAll('.app-screen').forEach(el => el.classList.add('hidden'));
-
-    // Show selected screen
     const target = document.getElementById(`screen-${screenName}`);
     if (target) {
         target.classList.remove('hidden');
     }
 
-    // Scroll to top
     window.scrollTo({ top: 0, behavior: 'smooth' });
-
-    // Update active nav link indicators
-    document.querySelectorAll('.nav-btn').forEach(btn => {
-        if (btn.dataset.screen === screenName) {
-            btn.classList.add('bg-indigo-600/20', 'text-indigo-400', 'border-indigo-500/50');
-            btn.classList.remove('text-slate-400', 'border-transparent');
-        } else {
-            btn.classList.remove('bg-indigo-600/20', 'text-indigo-400', 'border-indigo-500/50');
-            btn.classList.add('text-slate-400', 'border-transparent');
-        }
-    });
-
     updateNavUI();
 }
 
 function updateNavUI() {
-    const navUserBadge = document.getElementById('nav-user-badge');
+    const userNavSection = document.getElementById('user-nav-section');
+    const userEmailDisplay = document.getElementById('user-email-display');
     const mainNav = document.getElementById('main-nav');
     const authScreens = ['auth', 'username-setup'];
 
-    if (authScreens.includes(state.activeScreen)) {
+    if (authScreens.includes(state.activeScreen) || !state.currentUser) {
         if (mainNav) mainNav.classList.add('hidden');
+        if (userNavSection) userNavSection.classList.add('hidden');
     } else {
         if (mainNav) mainNav.classList.remove('hidden');
-    }
-
-    if (navUserBadge) {
-        if (state.currentProfile && state.currentProfile.username) {
-            navUserBadge.textContent = `@${state.currentProfile.username}`;
-            navUserBadge.classList.remove('hidden');
-        } else {
-            navUserBadge.classList.add('hidden');
+        if (userNavSection) userNavSection.classList.remove('hidden');
+        if (userEmailDisplay && state.currentUser) {
+            userEmailDisplay.textContent = state.currentUser.email || 'Signed In';
         }
     }
 
-    // Settings screen details
     const settingsUserEmail = document.getElementById('settings-user-email');
     const settingsUsername = document.getElementById('settings-username');
     if (settingsUserEmail && state.currentUser) {
-        settingsUserEmail.textContent = state.currentUser.email || 'OAuth Account';
+        settingsUserEmail.textContent = state.currentUser.email || 'User';
     }
     if (settingsUsername && state.currentProfile) {
         settingsUsername.textContent = `@${state.currentProfile.username}`;
@@ -838,62 +723,32 @@ function updateNavUI() {
 }
 
 function setupEventListeners() {
-    // Auth Form Submit
-    const authForm = document.getElementById('auth-form');
-    let isSignUpMode = false;
+    const signInBtn = document.getElementById('signin-btn');
+    const signUpBtn = document.getElementById('signup-btn');
 
-    const toggleAuthModeBtn = document.getElementById('toggle-auth-mode');
-    const authSubmitBtn = document.getElementById('auth-submit-btn');
-    const authTitle = document.getElementById('auth-title');
-    const passwordRulesBox = document.getElementById('password-rules-box');
-
-    toggleAuthModeBtn?.addEventListener('click', (e) => {
-        e.preventDefault();
-        isSignUpMode = !isSignUpMode;
-        if (isSignUpMode) {
-            authTitle.textContent = 'Create your Account';
-            authSubmitBtn.textContent = 'Sign Up';
-            toggleAuthModeBtn.textContent = 'Already have an account? Sign In';
-            passwordRulesBox?.classList.remove('hidden');
-        } else {
-            authTitle.textContent = 'Sign In to AP Hub';
-            authSubmitBtn.textContent = 'Sign In';
-            toggleAuthModeBtn.textContent = "Don't have an account? Sign Up";
-            passwordRulesBox?.classList.add('hidden');
-        }
-    });
-
-    authForm?.addEventListener('submit', async (e) => {
-        e.preventDefault();
+    signInBtn?.addEventListener('click', async () => {
         const email = document.getElementById('auth-email').value;
         const password = document.getElementById('auth-password').value;
-
-        if (isSignUpMode) {
-            await handleSignUp(email, password);
-        } else {
-            await handleSignIn(email, password);
-        }
+        await handleSignIn(email, password);
     });
 
-    // Password live indicator listener
+    signUpBtn?.addEventListener('click', async () => {
+        const email = document.getElementById('auth-email').value;
+        const password = document.getElementById('auth-password').value;
+        await handleSignUp(email, password);
+    });
+
     const authPasswordInput = document.getElementById('auth-password');
     authPasswordInput?.addEventListener('input', (e) => {
-        if (isSignUpMode) {
-            updatePasswordStrengthUI(e.target.value);
-        }
+        updatePasswordStrengthUI(e.target.value);
     });
 
-    // GitHub Sign In
-    document.getElementById('github-signin-btn')?.addEventListener('click', handleGitHubSignIn);
-
-    // Username Setup Form
     document.getElementById('username-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const username = document.getElementById('setup-username-input').value;
         await handleUsernameSetup(username);
     });
 
-    // Navigation Buttons
     document.querySelectorAll('.nav-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const screen = btn.dataset.screen;
@@ -901,10 +756,8 @@ function setupEventListeners() {
         });
     });
 
-    // Sign Out Button
     document.getElementById('signout-btn')?.addEventListener('click', handleSignOut);
 
-    // Add Resource Form
     const addForm = document.getElementById('add-resource-form');
     addForm?.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -921,14 +774,12 @@ function setupEventListeners() {
         });
     });
 
-    // Search and Filters
     const searchInput = document.getElementById('search-query-input');
     searchInput?.addEventListener('input', (e) => {
         state.searchQuery = e.target.value;
         renderResourceFeed();
     });
 
-    // View toggle buttons
     document.getElementById('view-grid-btn')?.addEventListener('click', () => {
         state.viewMode = 'grid';
         renderResourceFeed();
@@ -938,14 +789,12 @@ function setupEventListeners() {
         renderResourceFeed();
     });
 
-    // Change Password Form
     document.getElementById('change-password-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const newPass = document.getElementById('new-password-input').value;
         await handlePasswordChange(newPass);
     });
 
-    // Render Subject Pills in Search & Filter view
     populateSubjectFilters();
 }
 
