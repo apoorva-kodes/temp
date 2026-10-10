@@ -103,7 +103,7 @@ async function checkInitialSession() {
         if (demoUser) {
             const userObj = JSON.parse(demoUser);
             state.currentUser = userObj;
-            state.currentProfile = { username: userObj.username || userObj.email.split('@')[0] };
+            state.currentProfile = { username: userObj.username || (userObj.email ? userObj.email.split('@')[0] : 'demo_user') };
             switchScreen('feed');
             await loadResources();
         } else {
@@ -128,7 +128,10 @@ async function checkInitialSession() {
     });
 
     // Check current session
-    const { data: { session } } = await state.supabase.auth.getSession();
+    const { data: { session }, error } = await state.supabase.auth.getSession();
+    if (error) {
+        displayAuthError(error.message);
+    }
     if (!session) {
         switchScreen('auth');
     }
@@ -303,6 +306,41 @@ async function handleSignIn(email, password) {
         await fetchUserProfile(data.user.id);
     } catch (error) {
         displayAuthError(error.message || 'Invalid login credentials.');
+    } finally {
+        showLoading(false);
+    }
+}
+
+async function handleGitHubSignIn() {
+    clearAuthError();
+
+    if (state.isDemoMode) {
+        const githubUser = { id: 'user-github', email: 'github_student@example.com', username: 'GitHubStudent' };
+        state.currentUser = githubUser;
+        state.currentProfile = { username: githubUser.username };
+        localStorage.setItem('ap_hub_demo_user', JSON.stringify(githubUser));
+        showToast('Signed in via GitHub (Demo Mode)!', 'success');
+        switchScreen('feed');
+        await loadResources();
+        updateNavUI();
+        return;
+    }
+
+    try {
+        showLoading(true, 'Redirecting to GitHub...');
+        const redirectUrl = window.location.origin + window.location.pathname;
+        const { error } = await state.supabase.auth.signInWithOAuth({
+            provider: 'github',
+            options: {
+                redirectTo: redirectUrl
+            }
+        });
+
+        if (error) {
+            displayAuthError(error.message || 'GitHub Sign-In failed.');
+        }
+    } catch (error) {
+        displayAuthError(error.message || 'GitHub OAuth failed.');
     } finally {
         showLoading(false);
     }
@@ -708,14 +746,17 @@ function updateNavUI() {
         if (mainNav) mainNav.classList.remove('hidden');
         if (userNavSection) userNavSection.classList.remove('hidden');
         if (userEmailDisplay && state.currentUser) {
-            userEmailDisplay.textContent = state.currentUser.email || 'Signed In';
+            const userMetaData = state.currentUser.user_metadata || {};
+            const displayName = state.currentUser.email || userMetaData.user_name || userMetaData.preferred_username || 'Signed In';
+            userEmailDisplay.textContent = displayName;
         }
     }
 
     const settingsUserEmail = document.getElementById('settings-user-email');
     const settingsUsername = document.getElementById('settings-username');
     if (settingsUserEmail && state.currentUser) {
-        settingsUserEmail.textContent = state.currentUser.email || 'User';
+        const userMetaData = state.currentUser.user_metadata || {};
+        settingsUserEmail.textContent = state.currentUser.email || userMetaData.user_name || userMetaData.preferred_username || 'GitHub Account';
     }
     if (settingsUsername && state.currentProfile) {
         settingsUsername.textContent = `@${state.currentProfile.username}`;
@@ -725,6 +766,7 @@ function updateNavUI() {
 function setupEventListeners() {
     const signInBtn = document.getElementById('signin-btn');
     const signUpBtn = document.getElementById('signup-btn');
+    const githubSignInBtn = document.getElementById('github-signin-btn');
 
     signInBtn?.addEventListener('click', async () => {
         const email = document.getElementById('auth-email').value;
@@ -736,6 +778,10 @@ function setupEventListeners() {
         const email = document.getElementById('auth-email').value;
         const password = document.getElementById('auth-password').value;
         await handleSignUp(email, password);
+    });
+
+    githubSignInBtn?.addEventListener('click', async () => {
+        await handleGitHubSignIn();
     });
 
     const authPasswordInput = document.getElementById('auth-password');
