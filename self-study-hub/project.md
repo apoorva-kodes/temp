@@ -7,8 +7,8 @@ An AP study resource sharing platform where high school students self-studying A
 
 ## Sign-in
 - Email + password sign-in with password enforcement (8+ characters, lowercase, uppercase, number).
-- Sign in with GitHub via OAuth.
-- Persistent sessions across refreshes and sign-out functionality.
+- Sign in with GitHub via OAuth using dynamic redirect (`window.location.origin + window.location.pathname`).
+- Persistent sessions across refreshes and sign-out functionality via `supabase.auth.onAuthStateChange`.
 - Unique username setup on first sign-in (shown across the app instead of email address).
 
 ## Tables
@@ -64,7 +64,7 @@ GitHub Pages URL: to fill in
 - GitHub client secret: in Supabase, under GitHub sign-in settings
 
 ## Where we are right now
-Planning complete, nothing built yet.
+Email/Password authentication and GitHub OAuth are fully configured. Database tables (`profiles` and `resources`) created with RLS rules. Portfolio site index updated with project link.
 
 ## NOT doing, on purpose
 - Full-text search inside PDF/DOCX file contents (Requires server backend / OCR — Build 3/4).
@@ -72,7 +72,8 @@ Planning complete, nothing built yet.
 - Email confirmation / Forgot Password emails (Supabase free tier email limit).
 
 ## Next thing I want to add
-Set up Supabase sign-in settings, then email + password sign-in.
+Upload resources to Supabase Storage bucket (`ap-resources`) and test full resource publishing workflow.
 
 ## Change log
 - October 4, 2026: Planning session with Build 2 Planner. Plan confirmed.
+- October 13, 2026: Implemented Email/Password authentication & state change handling (`supabase.auth.signUp`, `supabase.auth.signInWithPassword`, `supabase.auth.onAuthStateChange`). Created `profiles` and `resources` PostgreSQL tables with Row Level Security policies. Implemented GitHub OAuth sign-in (`supabase.auth.signInWithOAuth`). Updated main portfolio landing page card with AP Study Hub details.
