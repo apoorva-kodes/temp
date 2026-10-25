@@ -36,7 +36,7 @@ const AP_SUBJECTS = [
 ];
 
 // Allowed File Extensions and Max Size (25MB)
-const ALLOWED_EXTENSIONS = ['.pdf', '.png', '.jpg', '.jpeg', '.docx', '.txt'];
+const ALLOWED_EXTENSIONS = ['.pdf', '.docx', '.png', '.jpg', '.jpeg', '.txt'];
 const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -686,8 +686,8 @@ function renderResourceFeed() {
 
                     <div class="flex flex-wrap gap-1.5 mb-4">
                         ${(item.tags || []).map(tag => `
-                            <span onclick="filterByTag('\${escapeHTML(tag)}')" class="cursor-pointer text-[11px] bg-slate-700/40 hover:bg-slate-700 text-slate-300 px-2 py-0.5 rounded-md transition-colors">
-                                #\${escapeHTML(tag)}
+                            <span onclick="filterByTag('${escapeHTML(tag)}')" class="cursor-pointer text-[11px] bg-slate-700/40 hover:bg-slate-700 text-slate-300 px-2 py-0.5 rounded-md transition-colors">
+                                #${escapeHTML(tag)}
                             </span>
                         `).join('')}
                     </div>
@@ -709,7 +709,7 @@ function renderResourceFeed() {
                             <i class="fa-solid fa-download"></i>
                         </a>
                         ${isOwner ? `
-                            <button onclick="confirmDeleteResource('\${item.id}')" class="p-1.5 bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-800/40 rounded-lg transition-colors" title="Delete">
+                            <button onclick="confirmDeleteResource('${item.id}')" class="p-1.5 bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-800/40 rounded-lg transition-colors" title="Delete">
                                 <i class="fa-solid fa-trash-can"></i>
                             </button>
                         ` : ''}

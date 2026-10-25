@@ -252,11 +252,11 @@
                     <div>
                         <label class="block text-xs font-medium text-slate-300 mb-1.5">Attach File (Max 25 MB) *</label>
                         <div class="relative border-2 border-dashed border-slate-700 hover:border-indigo-500/60 rounded-2xl p-6 text-center bg-slate-950/50 transition-colors">
-                            <input type="file" id="res-file-input" required accept=".pdf,.png,.jpg,.jpeg,.docx,.txt" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="document.getElementById('selected-file-name').textContent = this.files[0] ? this.files[0].name : 'No file chosen'">
+                            <input type="file" id="res-file-input" required accept=".pdf,.docx,.png,.jpg,.jpeg,.txt" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="document.getElementById('selected-file-name').textContent = this.files[0] ? this.files[0].name : 'No file chosen'">
                             <div class="space-y-2">
                                 <i class="fa-solid fa-cloud-arrow-up text-3xl text-indigo-400"></i>
                                 <p class="text-xs text-slate-300 font-medium">Click or drag file to upload</p>
-                                <p class="text-[11px] text-slate-500">Allowed formats: .pdf, .png, .jpg, .docx, .txt (Limit: 25 MB)</p>
+                                <p class="text-[11px] text-slate-500">Allowed formats: .pdf, .docx, .png, .jpg, .jpeg, .txt (Limit: 25 MB)</p>
                                 <p id="selected-file-name" class="text-xs font-semibold text-indigo-300 pt-2">No file chosen</p>
                             </div>
                         </div>
