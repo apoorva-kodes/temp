@@ -10,6 +10,7 @@ const state = {
     currentUser: null,      // Auth user object
     currentProfile: null,   // Profile database record (username, etc.)
     resources: [],          // Active resources list
+    savedFileIds: [],       // Array of resource IDs starred by user
     activeScreen: 'auth',   // 'auth', 'username-setup', 'feed', 'add-resource', 'search', 'settings'
     searchQuery: '',
     selectedSubject: 'ALL',
@@ -35,9 +36,19 @@ const AP_SUBJECTS = [
     'AP Environmental Science'
 ];
 
-// Allowed File Extensions and Max Size (25MB)
-const ALLOWED_EXTENSIONS = ['.pdf', '.docx', '.png', '.jpg', '.jpeg', '.txt'];
-const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
+// Target Storage Bucket Name
+const BUCKET_NAME = 'user-files';
+
+// File Limits: 10 MB Max
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+
+// Allowed Extensions (No Word .docx)
+const ALLOWED_EXTENSIONS = [
+    '.jpg', '.jpeg', '.png', '.webp', '.gif',
+    '.mp4', '.webm', '.ogg', '.mov',
+    '.mp3', '.wav', '.m4a',
+    '.pdf'
+];
 
 document.addEventListener('DOMContentLoaded', async () => {
     initSupabaseClient();
@@ -55,6 +66,7 @@ function initSupabaseClient() {
             state.isDemoMode = false;
         } catch (err) {
             console.warn('Failed to initialize Supabase client:', err);
+            showPlainError('Failed to initialize Supabase client: ' + err.message);
             enableDemoMode();
         }
     } else {
@@ -88,6 +100,8 @@ function getDefaultDemoResources() {
             tags: ['Progress Check', 'Gauss Law', 'FRQ'],
             file_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
             file_name: 'Gauss_Law_FRQ_Solutions.pdf',
+            file_size: 1048576,
+            file_path: 'user-deal/1700000000000-Gauss_Law_FRQ_Solutions.pdf',
             created_at: new Date(Date.now() - 3600000 * 24 * 2).toISOString()
         }
     ];
@@ -97,6 +111,44 @@ function saveDemoResources() {
     localStorage.setItem('ap_hub_demo_resources', JSON.stringify(state.demoResources));
 }
 
+// Requirement 4: Load starred file IDs for current user from localStorage
+function loadSavedFileIds() {
+    if (!state.currentUser) {
+        state.savedFileIds = [];
+        return;
+    }
+    const key = `ap_hub_saved_files_${state.currentUser.id}`;
+    const raw = localStorage.getItem(key);
+    if (raw) {
+        try {
+            state.savedFileIds = JSON.parse(raw);
+        } catch (e) {
+            state.savedFileIds = [];
+        }
+    } else {
+        state.savedFileIds = [];
+    }
+}
+
+function persistSavedFileIds() {
+    if (!state.currentUser) return;
+    const key = `ap_hub_saved_files_${state.currentUser.id}`;
+    localStorage.setItem(key, JSON.stringify(state.savedFileIds));
+}
+
+function toggleStarFile(resourceId) {
+    const index = state.savedFileIds.indexOf(resourceId);
+    if (index > -1) {
+        state.savedFileIds.splice(index, 1);
+        showToast('File removed from Saved Files', 'info');
+    } else {
+        state.savedFileIds.push(resourceId);
+        showToast('File added to Saved Files!', 'success');
+    }
+    persistSavedFileIds();
+    renderResourceFeed();
+}
+
 async function checkInitialSession() {
     if (state.isDemoMode) {
         const demoUser = localStorage.getItem('ap_hub_demo_user');
@@ -104,6 +156,7 @@ async function checkInitialSession() {
             const userObj = JSON.parse(demoUser);
             state.currentUser = userObj;
             state.currentProfile = { username: userObj.username || (userObj.email ? userObj.email.split('@')[0] : 'demo_user') };
+            loadSavedFileIds();
             switchScreen('feed');
             await loadResources();
         } else {
@@ -113,23 +166,23 @@ async function checkInitialSession() {
         return;
     }
 
-    // Set up auth state change listener
     state.supabase.auth.onAuthStateChange(async (event, session) => {
         if (session && session.user) {
             state.currentUser = session.user;
-            updateNavUI();
+            loadSavedFileIds();
             await fetchUserProfile(session.user.id);
         } else {
             state.currentUser = null;
             state.currentProfile = null;
+            state.savedFileIds = [];
             switchScreen('auth');
             updateNavUI();
         }
     });
 
-    // Check current session
     const { data: { session }, error } = await state.supabase.auth.getSession();
     if (error) {
+        showPlainError(error.message);
         displayAuthError(error.message);
     }
     if (!session) {
@@ -145,7 +198,14 @@ async function fetchUserProfile(userId) {
             .from('profiles')
             .select('*')
             .eq('id', userId)
-            .single();
+            .maybeSingle();
+
+        if (error) {
+            showPlainError('Profile lookup failed: ' + error.message);
+            switchScreen('username-setup');
+            updateNavUI();
+            return;
+        }
 
         if (data && data.username) {
             state.currentProfile = data;
@@ -157,6 +217,7 @@ async function fetchUserProfile(userId) {
             switchScreen('username-setup');
         }
     } catch (e) {
+        showPlainError(e.message || 'Error fetching user profile.');
         switchScreen('username-setup');
     }
     updateNavUI();
@@ -211,6 +272,21 @@ function clearAuthError() {
     if (box) box.classList.add('hidden');
 }
 
+function showPlainError(message) {
+    const banner = document.getElementById('supabase-error-banner');
+    const text = document.getElementById('supabase-error-banner-text');
+    if (banner && text) {
+        text.textContent = message;
+        banner.classList.remove('hidden');
+    }
+    showToast(message, 'error');
+}
+
+function dismissErrorBanner() {
+    const banner = document.getElementById('supabase-error-banner');
+    if (banner) banner.classList.add('hidden');
+}
+
 async function handleSignUp(email, password) {
     clearAuthError();
 
@@ -243,11 +319,8 @@ async function handleSignUp(email, password) {
         });
 
         if (error) {
-            if (error.message.includes('already registered')) {
-                displayAuthError('An account with this email address already exists.');
-            } else {
-                displayAuthError(error.message);
-            }
+            showPlainError(error.message);
+            displayAuthError(error.message);
             return;
         }
 
@@ -257,7 +330,7 @@ async function handleSignUp(email, password) {
             switchScreen('username-setup');
         }
     } catch (error) {
-        displayAuthError(error.message || 'Error signing up.');
+        showPlainError(error.message || 'Error signing up.');
     } finally {
         showLoading(false);
     }
@@ -277,6 +350,7 @@ async function handleSignIn(email, password) {
         state.currentUser = userObj;
         state.currentProfile = { username: userObj.username };
         localStorage.setItem('ap_hub_demo_user', JSON.stringify(userObj));
+        loadSavedFileIds();
         showToast('Signed in successfully!', 'success');
         
         switchScreen('feed');
@@ -293,19 +367,17 @@ async function handleSignIn(email, password) {
         });
 
         if (error) {
-            if (error.message.includes('Invalid login credentials')) {
-                displayAuthError('Incorrect email or password. Please try again.');
-            } else {
-                displayAuthError(error.message);
-            }
+            showPlainError(error.message);
+            displayAuthError(error.message);
             return;
         }
 
         showToast('Welcome back!', 'success');
         state.currentUser = data.user;
+        loadSavedFileIds();
         await fetchUserProfile(data.user.id);
     } catch (error) {
-        displayAuthError(error.message || 'Invalid login credentials.');
+        showPlainError(error.message || 'Invalid login credentials.');
     } finally {
         showLoading(false);
     }
@@ -319,6 +391,7 @@ async function handleGitHubSignIn() {
         state.currentUser = githubUser;
         state.currentProfile = { username: githubUser.username };
         localStorage.setItem('ap_hub_demo_user', JSON.stringify(githubUser));
+        loadSavedFileIds();
         showToast('Signed in via GitHub (Demo Mode)!', 'success');
         switchScreen('feed');
         await loadResources();
@@ -337,10 +410,10 @@ async function handleGitHubSignIn() {
         });
 
         if (error) {
-            displayAuthError(error.message || 'GitHub Sign-In failed.');
+            showPlainError(error.message);
         }
     } catch (error) {
-        displayAuthError(error.message || 'GitHub OAuth failed.');
+        showPlainError(error.message || 'GitHub OAuth failed.');
     } finally {
         showLoading(false);
     }
@@ -351,6 +424,7 @@ async function handleSignOut() {
         localStorage.removeItem('ap_hub_demo_user');
         state.currentUser = null;
         state.currentProfile = null;
+        state.savedFileIds = [];
         showToast('Signed out successfully.', 'info');
         switchScreen('auth');
         updateNavUI();
@@ -361,18 +435,30 @@ async function handleSignOut() {
         await state.supabase.auth.signOut();
         state.currentUser = null;
         state.currentProfile = null;
+        state.savedFileIds = [];
         showToast('Signed out successfully.', 'info');
         switchScreen('auth');
         updateNavUI();
     } catch (error) {
-        showToast('Error signing out.', 'error');
+        showPlainError(error.message || 'Error signing out.');
     }
 }
 
 async function handleUsernameSetup(username) {
-    const trimmed = username.trim();
+    const errEl = document.getElementById('username-error-msg');
+    if (errEl) {
+        errEl.textContent = '';
+        errEl.classList.add('hidden');
+    }
+
+    const trimmed = username.trim().toLowerCase().replace(/^@/, '');
     if (!trimmed || trimmed.length < 3) {
-        showToast('Username must be at least 3 characters long.', 'error');
+        if (errEl) {
+            errEl.textContent = 'Username must be at least 3 characters long.';
+            errEl.classList.remove('hidden');
+        } else {
+            showToast('Username must be at least 3 characters long.', 'error');
+        }
         return;
     }
 
@@ -390,19 +476,30 @@ async function handleUsernameSetup(username) {
     }
 
     try {
-        showLoading(true);
-        const { data: existing } = await state.supabase
+        showLoading(true, 'Saving profile...');
+        
+        const { data: existing, error: checkErr } = await state.supabase
             .from('profiles')
-            .select('id')
+            .select('id, username')
             .eq('username', trimmed)
             .maybeSingle();
 
+        if (checkErr) {
+            showPlainError(checkErr.message);
+            throw checkErr;
+        }
+
         if (existing && existing.id !== state.currentUser.id) {
-            showToast('Username is already taken. Please choose another.', 'error');
+            const takenMsg = `Username "@${trimmed}" is taken. Please pick another.`;
+            if (errEl) {
+                errEl.textContent = takenMsg;
+                errEl.classList.remove('hidden');
+            }
+            showToast(takenMsg, 'error');
             return;
         }
 
-        const { error } = await state.supabase
+        const { error: upsertErr } = await state.supabase
             .from('profiles')
             .upsert({
                 id: state.currentUser.id,
@@ -410,15 +507,22 @@ async function handleUsernameSetup(username) {
                 created_at: new Date().toISOString()
             });
 
-        if (error) throw error;
+        if (upsertErr) {
+            showPlainError(upsertErr.message);
+            if (errEl) {
+                errEl.textContent = upsertErr.message;
+                errEl.classList.remove('hidden');
+            }
+            throw upsertErr;
+        }
 
         state.currentProfile = { id: state.currentUser.id, username: trimmed };
-        showToast(`Welcome @${trimmed}!`, 'success');
+        showToast(`Welcome @${trimmed}! Your profile is saved.`, 'success');
         switchScreen('feed');
         await loadResources();
         updateNavUI();
     } catch (error) {
-        showToast(error.message || 'Failed to save username.', 'error');
+        showPlainError(error.message || 'Failed to save username.');
     } finally {
         showLoading(false);
     }
@@ -427,18 +531,21 @@ async function handleUsernameSetup(username) {
 async function loadResources() {
     if (state.isDemoMode) {
         state.resources = [...state.demoResources];
-        renderResourceFeed();
+        await renderResourceFeed();
         return;
     }
 
     try {
-        showLoading(true);
+        showLoading(true, 'Loading resources...');
         const { data: resourcesData, error: resError } = await state.supabase
             .from('resources')
             .select('*')
             .order('created_at', { ascending: false });
 
-        if (resError) throw resError;
+        if (resError) {
+            showPlainError(resError.message);
+            throw resError;
+        }
 
         const { data: profilesData } = await state.supabase
             .from('profiles')
@@ -449,34 +556,81 @@ async function loadResources() {
             profilesData.forEach(p => { profileMap[p.id] = p.username; });
         }
 
-        state.resources = (resourcesData || []).map(item => ({
-            ...item,
-            username: profileMap[item.user_id] || 'AP Student',
-            tags: Array.isArray(item.tags) ? item.tags : (item.tags ? item.tags.split(',').map(t => t.trim()) : [])
+        const loadedResources = await Promise.all((resourcesData || []).map(async (item) => {
+            let fileUrl = item.file_url;
+
+            if (item.file_path && state.supabase) {
+                const { data: signedData, error: signedErr } = await state.supabase.storage
+                    .from(BUCKET_NAME)
+                    .createSignedUrl(item.file_path, 3600);
+
+                if (!signedErr && signedData?.signedUrl) {
+                    fileUrl = signedData.signedUrl;
+                }
+            }
+
+            return {
+                ...item,
+                file_url: fileUrl,
+                username: item.username || profileMap[item.user_id] || 'AP Student',
+                tags: Array.isArray(item.tags) ? item.tags : (item.tags ? item.tags.split(',').map(t => t.trim()) : [])
+            };
         }));
 
-        renderResourceFeed();
+        state.resources = loadedResources;
+        await renderResourceFeed();
     } catch (error) {
-        showToast('Failed to load resources.', 'error');
+        showPlainError(error.message || 'Failed to load resources.');
     } finally {
         showLoading(false);
     }
 }
 
+function handleFileSelect(inputElement) {
+    const file = inputElement.files[0];
+    const nameDisplay = document.getElementById('selected-file-name');
+    
+    if (!file) {
+        if (nameDisplay) nameDisplay.textContent = 'No file chosen';
+        return;
+    }
+
+    const fileExt = '.' + file.name.split('.').pop().toLowerCase();
+
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+        showPlainError(`File "${file.name}" exceeds the 10 MB limit. Current size: ${(file.size / (1024 * 1024)).toFixed(2)} MB.`);
+        inputElement.value = '';
+        if (nameDisplay) nameDisplay.textContent = 'No file chosen';
+        return;
+    }
+
+    if (!ALLOWED_EXTENSIONS.includes(fileExt)) {
+        showPlainError(`File format "${fileExt}" is not allowed. Allowed types: JPG, PNG, WEBP, GIF, Video, Audio, and PDF.`);
+        inputElement.value = '';
+        if (nameDisplay) nameDisplay.textContent = 'No file chosen';
+        return;
+    }
+
+    if (nameDisplay) {
+        nameDisplay.textContent = `${file.name} (${formatBytes(file.size)})`;
+    }
+}
+
+// Requirement 3: Real progress bar synced directly with Supabase via uploadResumable / XHR Progress
 async function handleResourceUpload({ title, subject, tags, file }) {
     if (!file) {
         showToast('Please select a file to upload.', 'error');
         return;
     }
 
-    const ext = '.' + file.name.split('.').pop().toLowerCase();
-    if (!ALLOWED_EXTENSIONS.includes(ext)) {
-        showToast(`Invalid file format. Allowed: ${ALLOWED_EXTENSIONS.join(', ')}`, 'error');
+    const fileExt = '.' + file.name.split('.').pop().toLowerCase();
+    if (!ALLOWED_EXTENSIONS.includes(fileExt)) {
+        showPlainError(`Invalid file format. Allowed types: JPG, PNG, WEBP, GIF, Video, Audio, PDF.`);
         return;
     }
 
     if (file.size > MAX_FILE_SIZE_BYTES) {
-        showToast('File size exceeds 25 MB.', 'error');
+        showPlainError(`File size exceeds 10 MB limit. Yours is ${(file.size / (1024 * 1024)).toFixed(2)} MB.`);
         return;
     }
 
@@ -484,16 +638,28 @@ async function handleResourceUpload({ title, subject, tags, file }) {
         .map(t => t.trim().replace(/^#/, ''))
         .filter(t => t.length > 0);
 
+    const submitBtn = document.getElementById('add-file-submit-btn');
+    const progressContainer = document.getElementById('upload-progress-container');
+    const progressBar = document.getElementById('upload-progress-bar');
+    const progressPercent = document.getElementById('upload-progress-percent');
+
+    const timestamp = Date.now();
+    const cleanFileName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+    const filePath = `${state.currentUser ? state.currentUser.id : 'user-demo'}/${timestamp}-${cleanFileName}`;
+
     if (state.isDemoMode) {
+        const demoUrl = URL.createObjectURL(file);
         const newRes = {
-            id: 'res-' + Date.now(),
+            id: 'res-' + timestamp,
             user_id: state.currentUser ? state.currentUser.id : 'user-demo',
             username: state.currentProfile ? state.currentProfile.username : 'You',
             title: title.trim(),
             subject: subject,
             tags: parsedTags.length > 0 ? parsedTags : ['AP Prep'],
-            file_url: URL.createObjectURL(file),
+            file_url: demoUrl,
             file_name: file.name,
+            file_size: file.size,
+            file_path: filePath,
             created_at: new Date().toISOString()
         };
 
@@ -501,7 +667,7 @@ async function handleResourceUpload({ title, subject, tags, file }) {
         saveDemoResources();
         state.resources.unshift(newRes);
 
-        showToast('Resource uploaded successfully!', 'success');
+        showToast('Resource uploaded successfully (Demo Mode)!', 'success');
         resetAddResourceForm();
         switchScreen('feed');
         renderResourceFeed();
@@ -509,48 +675,99 @@ async function handleResourceUpload({ title, subject, tags, file }) {
     }
 
     try {
-        showLoading(true, 'Uploading file...');
+        if (submitBtn) submitBtn.disabled = true;
+        if (progressContainer) progressContainer.classList.remove('hidden');
+        if (progressBar) progressBar.style.width = '0%';
+        if (progressPercent) progressPercent.textContent = '0%';
 
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
-        const filePath = `${state.currentUser.id}/${fileName}`;
+        // Use Resumable upload (TUS) or XHR upload listener to track REAL percentage from Supabase Storage
+        await new Promise((resolve, reject) => {
+            const uploadTask = state.supabase.storage
+                .from(BUCKET_NAME)
+                .uploadResumable(filePath, file, {
+                    cacheControl: '3600',
+                    upsert: false,
+                    onProgress: (progress) => {
+                        if (progress.totalBytes > 0) {
+                            const percent = Math.min(100, Math.round((progress.bytesUploaded / progress.totalBytes) * 100));
+                            if (progressBar) progressBar.style.width = `${percent}%`;
+                            if (progressPercent) progressPercent.textContent = `${percent}%`;
+                        }
+                    }
+                });
 
-        const { error: storageError } = await state.supabase.storage
-            .from('ap-resources')
-            .upload(filePath, file);
+            // Handle promise completion fallback if uploadResumable isn't supported
+            if (uploadTask && typeof uploadTask.then === 'function') {
+                uploadTask.then(res => {
+                    if (res.error) reject(res.error);
+                    else resolve(res.data);
+                }).catch(reject);
+            } else {
+                // Direct upload fallback with progress state
+                state.supabase.storage
+                    .from(BUCKET_NAME)
+                    .upload(filePath, file)
+                    .then(res => {
+                        if (res.error) reject(res.error);
+                        else {
+                            if (progressBar) progressBar.style.width = '100%';
+                            if (progressPercent) progressPercent.textContent = '100%';
+                            resolve(res.data);
+                        }
+                    })
+                    .catch(reject);
+            }
+        });
 
-        if (storageError) throw storageError;
+        let publicUrl = '';
+        const { data: signedData, error: signedErr } = await state.supabase.storage
+            .from(BUCKET_NAME)
+            .createSignedUrl(filePath, 3600 * 24 * 365);
 
-        const { data: { publicUrl } } = state.supabase.storage
-            .from('ap-resources')
-            .getPublicUrl(filePath);
+        if (!signedErr && signedData?.signedUrl) {
+            publicUrl = signedData.signedUrl;
+        } else {
+            const { data: urlData } = state.supabase.storage
+                .from(BUCKET_NAME)
+                .getPublicUrl(filePath);
+            publicUrl = urlData.publicUrl;
+        }
+
+        const username = state.currentProfile ? state.currentProfile.username : 'AP Student';
 
         const { error: dbError } = await state.supabase
             .from('resources')
             .insert({
                 user_id: state.currentUser.id,
+                username: username,
                 title: title.trim(),
                 subject: subject,
                 tags: parsedTags,
                 file_url: publicUrl,
                 file_name: file.name,
+                file_size: file.size,
+                file_path: filePath,
                 created_at: new Date().toISOString()
             });
 
-        if (dbError) throw dbError;
+        if (dbError) {
+            showPlainError(`Database Insert Error: ${dbError.message}`);
+            throw dbError;
+        }
 
-        showToast('Resource published to the hub!', 'success');
+        showToast('File published to the hub!', 'success');
         resetAddResourceForm();
         switchScreen('feed');
         await loadResources();
     } catch (error) {
-        showToast(error.message || 'Error uploading resource.', 'error');
+        showPlainError(error.message || 'Error uploading file.');
     } finally {
-        showLoading(false);
+        if (submitBtn) submitBtn.disabled = false;
+        if (progressContainer) progressContainer.classList.add('hidden');
     }
 }
 
-async function handleDeleteResource(resourceId) {
+async function handleDeleteResource(resourceId, filePath) {
     if (state.isDemoMode) {
         state.demoResources = state.demoResources.filter(r => r.id !== resourceId);
         saveDemoResources();
@@ -561,19 +778,33 @@ async function handleDeleteResource(resourceId) {
     }
 
     try {
-        showLoading(true, 'Deleting resource...');
+        showLoading(true, 'Deleting file...');
+
         const { error: dbError } = await state.supabase
             .from('resources')
             .delete()
             .eq('id', resourceId)
             .eq('user_id', state.currentUser.id);
 
-        if (dbError) throw dbError;
+        if (dbError) {
+            showPlainError(`Database Error: ${dbError.message}`);
+            throw dbError;
+        }
 
-        showToast('Resource deleted.', 'info');
+        if (filePath) {
+            const { error: storageError } = await state.supabase.storage
+                .from(BUCKET_NAME)
+                .remove([filePath]);
+
+            if (storageError) {
+                console.warn('Storage removal warning:', storageError.message);
+            }
+        }
+
+        showToast('File deleted successfully.', 'info');
         await loadResources();
     } catch (error) {
-        showToast(error.message || 'Could not delete resource.', 'error');
+        showPlainError(error.message || 'Could not delete file.');
     } finally {
         showLoading(false);
     }
@@ -595,12 +826,15 @@ async function handlePasswordChange(newPassword) {
     try {
         showLoading(true);
         const { error } = await state.supabase.auth.updateUser({ password: newPassword });
-        if (error) throw error;
+        if (error) {
+            showPlainError(error.message);
+            throw error;
+        }
 
         showToast('Password updated successfully!', 'success');
         document.getElementById('change-password-form')?.reset();
     } catch (error) {
-        showToast(error.message || 'Failed to update password.', 'error');
+        showPlainError(error.message || 'Failed to update password.');
     } finally {
         showLoading(false);
     }
@@ -622,102 +856,195 @@ function getFilteredResources() {
     });
 }
 
-function renderResourceFeed() {
+// Requirements 4 & 5: Render single Card with clickable yellow star and Delete button
+function renderSingleFileCard(item, currentUserId) {
+    const isOwner = currentUserId && (item.user_id === currentUserId || (state.isDemoMode && item.username === state.currentProfile?.username));
+    const isStarred = state.savedFileIds.includes(item.id);
+    const fileExt = item.file_name ? item.file_name.split('.').pop().toLowerCase() : '';
+    const sizeStr = item.file_size ? formatBytes(item.file_size) : 'File';
+
+    let mediaPreviewHTML = '';
+
+    if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(fileExt)) {
+        mediaPreviewHTML = `
+            <div class="mt-3 overflow-hidden rounded-xl border border-slate-700/60 max-h-48 bg-slate-950 flex items-center justify-center">
+                <img src="${escapeHTML(item.file_url)}" class="max-h-48 w-full object-cover group-hover:scale-105 transition-transform duration-300" alt="${escapeHTML(item.title)}" loading="lazy"/>
+            </div>
+        `;
+    } else if (['mp4', 'webm', 'ogg', 'mov'].includes(fileExt)) {
+        mediaPreviewHTML = `
+            <div class="mt-3 rounded-xl border border-slate-700/60 overflow-hidden bg-slate-950">
+                <video controls preload="metadata" class="w-full max-h-48">
+                    <source src="${escapeHTML(item.file_url)}">
+                    Your browser does not support video.
+                </video>
+            </div>
+        `;
+    } else if (['mp3', 'wav', 'm4a'].includes(fileExt)) {
+        mediaPreviewHTML = `
+            <div class="mt-3 p-2 rounded-xl bg-slate-950 border border-slate-700/60">
+                <audio controls class="w-full h-9">
+                    <source src="${escapeHTML(item.file_url)}">
+                    Your browser does not support audio.
+                </audio>
+            </div>
+        `;
+    } else if (fileExt === 'pdf') {
+        mediaPreviewHTML = `
+            <div class="mt-3 p-3 rounded-xl bg-slate-950 border border-slate-700/60 flex items-center justify-between">
+                <div class="flex items-center gap-2 text-rose-400 text-xs font-semibold">
+                    <i class="fa-solid fa-file-pdf text-base"></i> PDF Document
+                </div>
+                <a href="${escapeHTML(item.file_url)}" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1 bg-rose-950/60 hover:bg-rose-900/80 text-rose-200 border border-rose-800/60 text-[11px] font-semibold rounded-lg inline-flex items-center gap-1.5 transition-colors">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Open PDF
+                </a>
+            </div>
+        `;
+    }
+
+    return `
+        <div class="bg-slate-800/60 border border-slate-700/60 hover:border-indigo-500/50 rounded-2xl p-5 transition-all duration-200 flex flex-col justify-between group hover:shadow-xl hover:shadow-indigo-950/20">
+            <div>
+                <div class="flex items-start justify-between gap-3 mb-2">
+                    <span class="inline-block text-xs font-semibold px-2.5 py-1 bg-indigo-950/90 text-indigo-300 border border-indigo-800/60 rounded-lg">
+                        ${escapeHTML(item.subject)}
+                    </span>
+                    <div class="flex items-center gap-2">
+                        <!-- Requirement 4: Clickable Star button (Turns yellow when saved) -->
+                        <button onclick="toggleStarFile('${item.id}')" class="p-1.5 rounded-lg border transition-all ${
+                            isStarred
+                                ? 'bg-amber-500/20 text-amber-400 border-amber-500/50 hover:bg-amber-500/30'
+                                : 'bg-slate-900 text-slate-500 border-slate-700/50 hover:text-amber-400 hover:border-amber-500/30'
+                        }" title="${isStarred ? 'Unstar file' : 'Star & save file'}">
+                            <i class="${isStarred ? 'fa-solid' : 'fa-regular'} fa-star text-sm"></i>
+                        </button>
+                        <span class="text-[11px] text-slate-400 font-mono bg-slate-900 px-2 py-0.5 rounded border border-slate-700/50">
+                            ${sizeStr}
+                        </span>
+                    </div>
+                </div>
+
+                <h4 class="text-base font-semibold text-slate-100 group-hover:text-indigo-300 transition-colors line-clamp-2 mb-1">
+                    ${escapeHTML(item.title)}
+                </h4>
+
+                <p class="text-xs text-slate-400 truncate mb-2">
+                    <i class="fa-solid fa-paperclip mr-1 text-slate-500"></i>${escapeHTML(item.file_name)}
+                </p>
+
+                ${mediaPreviewHTML}
+
+                <div class="flex flex-wrap gap-1.5 my-3">
+                    ${(item.tags || []).map(tag => `
+                        <span onclick="filterByTag('${escapeHTML(tag)}')" class="cursor-pointer text-[11px] bg-slate-700/40 hover:bg-slate-700 text-slate-300 px-2 py-0.5 rounded-md transition-colors">
+                            #${escapeHTML(tag)}
+                        </span>
+                    `).join('')}
+                </div>
+            </div>
+
+            <div class="pt-3 border-t border-slate-700/40 flex items-center justify-between text-xs text-slate-400">
+                <div class="flex items-center gap-1.5 min-w-0">
+                    <div class="w-6 h-6 rounded-full bg-indigo-600/30 text-indigo-300 flex items-center justify-center text-[10px] font-bold uppercase">
+                        ${escapeHTML(item.username).replace(/^@/, '').charAt(0)}
+                    </div>
+                    <span class="truncate font-semibold text-indigo-300">@${escapeHTML(item.username).replace(/^@/, '')}</span>
+                </div>
+
+                <div class="flex items-center gap-1.5 shrink-0">
+                    <a href="${escapeHTML(item.file_url)}" download="${escapeHTML(item.file_name)}" target="_blank" class="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors font-medium text-xs inline-flex items-center gap-1 shadow-sm" title="Download File">
+                        <i class="fa-solid fa-download"></i> Download
+                    </a>
+
+                    ${isOwner ? `
+                        <button onclick="confirmDeleteResource('${item.id}', '${escapeHTML(item.file_path || '')}')" class="p-1.5 bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-800/40 rounded-lg transition-colors" title="Delete File">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    ` : ''}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Requirements 4 & 5: Render Saved Files, My Files, and All Community Files
+async function renderResourceFeed() {
     const feedContainer = document.getElementById('resource-feed-container');
+    const savedContainer = document.getElementById('saved-files-container');
+    const myFilesContainer = document.getElementById('my-files-container');
+
     const resultsCountEl = document.getElementById('results-count');
-    if (!feedContainer) return;
+    const savedCountEl = document.getElementById('saved-files-count');
+    const myFilesCountEl = document.getElementById('my-files-count');
 
     const filtered = getFilteredResources();
-
-    if (resultsCountEl) {
-        resultsCountEl.textContent = `${filtered.length} resource${filtered.length === 1 ? '' : 's'} available`;
-    }
-
-    if (filtered.length === 0) {
-        feedContainer.innerHTML = `
-            <div class="col-span-full py-16 text-center bg-slate-800/40 border border-slate-700/60 rounded-2xl p-8">
-                <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-700/50 flex items-center justify-center text-slate-400 text-2xl">
-                    <i class="fa-solid fa-folder-open"></i>
-                </div>
-                <h3 class="text-xl font-semibold text-slate-200 mb-1">No AP Resources Found</h3>
-                <p class="text-slate-400 max-w-md mx-auto text-sm mb-6">
-                    Try clearing your active search filters or selecting a different subject.
-                </p>
-                <button onclick="switchScreen('add-resource')" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-medium transition-all duration-200 inline-flex items-center gap-2 shadow-lg shadow-indigo-600/20">
-                    <i class="fa-solid fa-plus"></i> Upload First Resource
-                </button>
-            </div>
-        `;
-        return;
-    }
-
     const currentUserId = state.currentUser ? state.currentUser.id : null;
 
-    feedContainer.className = state.viewMode === 'grid'
-        ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5'
-        : 'flex flex-col gap-3';
+    if (resultsCountEl) {
+        resultsCountEl.textContent = `${filtered.length} file${filtered.length === 1 ? '' : 's'} available`;
+    }
 
-    feedContainer.innerHTML = filtered.map(item => {
-        const isOwner = currentUserId && (item.user_id === currentUserId || (state.isDemoMode && item.username === state.currentProfile?.username));
-        const fileExt = item.file_name ? item.file_name.split('.').pop().toUpperCase() : 'FILE';
-        
-        let iconClass = 'fa-file-lines text-indigo-400';
-        if (['PNG', 'JPG', 'JPEG'].includes(fileExt)) iconClass = 'fa-file-image text-emerald-400';
-        else if (fileExt === 'PDF') iconClass = 'fa-file-pdf text-rose-400';
-        else if (['DOC', 'DOCX'].includes(fileExt)) iconClass = 'fa-file-word text-blue-400';
+    // 1. Render Saved Files Subsection (Requirement 4)
+    const savedFiles = state.resources.filter(r => state.savedFileIds.includes(r.id));
+    if (savedCountEl) savedCountEl.textContent = `(${savedFiles.length})`;
 
-        const formattedDate = item.created_at ? new Date(item.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently';
-
-        return `
-            <div class="bg-slate-800/60 border border-slate-700/60 hover:border-indigo-500/50 rounded-2xl p-5 transition-all duration-200 flex flex-col justify-between group hover:shadow-xl hover:shadow-indigo-950/20">
-                <div>
-                    <div class="flex items-start justify-between gap-3 mb-3">
-                        <span class="inline-block text-xs font-semibold px-2.5 py-1 bg-indigo-950/90 text-indigo-300 border border-indigo-800/60 rounded-lg">
-                            ${escapeHTML(item.subject)}
-                        </span>
-                        <div class="w-8 h-8 rounded-lg bg-slate-700/50 flex items-center justify-center text-lg shrink-0">
-                            <i class="fa-solid ${iconClass}"></i>
-                        </div>
-                    </div>
-
-                    <h4 class="text-base font-semibold text-slate-100 group-hover:text-indigo-300 transition-colors line-clamp-2 mb-2">
-                        ${escapeHTML(item.title)}
-                    </h4>
-
-                    <div class="flex flex-wrap gap-1.5 mb-4">
-                        ${(item.tags || []).map(tag => `
-                            <span onclick="filterByTag('${escapeHTML(tag)}')" class="cursor-pointer text-[11px] bg-slate-700/40 hover:bg-slate-700 text-slate-300 px-2 py-0.5 rounded-md transition-colors">
-                                #${escapeHTML(tag)}
-                            </span>
-                        `).join('')}
-                    </div>
+    if (savedContainer) {
+        if (savedFiles.length === 0) {
+            savedContainer.innerHTML = `
+                <div class="col-span-full py-6 text-center bg-slate-900/40 border border-slate-800 rounded-2xl p-4">
+                    <p class="text-xs text-slate-500">No saved files yet. Click the <i class="fa-regular fa-star text-amber-400"></i> star on any file to save it here.</p>
                 </div>
+            `;
+        } else {
+            savedContainer.className = state.viewMode === 'grid'
+                ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5'
+                : 'flex flex-col gap-3';
+            savedContainer.innerHTML = savedFiles.map(item => renderSingleFileCard(item, currentUserId)).join('');
+        }
+    }
 
-                <div class="pt-3 border-t border-slate-700/40 flex items-center justify-between text-xs text-slate-400">
-                    <div class="flex items-center gap-1.5 min-w-0">
-                        <div class="w-6 h-6 rounded-full bg-indigo-600/30 text-indigo-300 flex items-center justify-center text-[10px] font-bold uppercase">
-                            ${escapeHTML(item.username).charAt(0)}
-                        </div>
-                        <span class="truncate font-medium text-slate-300">@${escapeHTML(item.username)}</span>
-                    </div>
+    // 2. Render My Files Subsection (Requirement 5)
+    const myFiles = state.resources.filter(r => currentUserId && (r.user_id === currentUserId || (state.isDemoMode && r.username === state.currentProfile?.username)));
+    if (myFilesCountEl) myFilesCountEl.textContent = `(${myFiles.length})`;
 
-                    <div class="flex items-center gap-1.5 shrink-0">
-                        <button onclick="previewFile('${escapeHTML(item.file_url)}', '${escapeHTML(item.title)}', '${fileExt}')" class="p-1.5 bg-slate-700/60 hover:bg-slate-600 text-slate-200 rounded-lg transition-colors" title="Quick View">
-                            <i class="fa-solid fa-eye"></i>
-                        </button>
-                        <a href="${escapeHTML(item.file_url)}" download="${escapeHTML(item.file_name)}" target="_blank" class="p-1.5 bg-indigo-600/80 hover:bg-indigo-600 text-white rounded-lg transition-colors" title="Download File">
-                            <i class="fa-solid fa-download"></i>
-                        </a>
-                        ${isOwner ? `
-                            <button onclick="confirmDeleteResource('${item.id}')" class="p-1.5 bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-800/40 rounded-lg transition-colors" title="Delete">
-                                <i class="fa-solid fa-trash-can"></i>
-                            </button>
-                        ` : ''}
-                    </div>
+    if (myFilesContainer) {
+        if (myFiles.length === 0) {
+            myFilesContainer.innerHTML = `
+                <div class="col-span-full py-6 text-center bg-slate-900/40 border border-slate-800 rounded-2xl p-4">
+                    <p class="text-xs text-slate-500">You haven't uploaded any files yet. Click "Add file" above to upload your first note.</p>
                 </div>
-            </div>
-        `;
-    }).join('');
+            `;
+        } else {
+            myFilesContainer.className = state.viewMode === 'grid'
+                ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5'
+                : 'flex flex-col gap-3';
+            myFilesContainer.innerHTML = myFiles.map(item => renderSingleFileCard(item, currentUserId)).join('');
+        }
+    }
+
+    // 3. Render All Filtered Community Feed
+    if (feedContainer) {
+        if (filtered.length === 0) {
+            feedContainer.innerHTML = `
+                <div class="col-span-full py-12 text-center bg-slate-800/40 border border-slate-700/60 rounded-2xl p-8">
+                    <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-slate-700/50 flex items-center justify-center text-slate-400 text-xl">
+                        <i class="fa-solid fa-folder-open"></i>
+                    </div>
+                    <h3 class="text-base font-semibold text-slate-200 mb-1">No AP Resources Found</h3>
+                    <p class="text-slate-400 max-w-md mx-auto text-xs mb-4">
+                        Try clearing your search query or selecting a different subject.
+                    </p>
+                </div>
+            `;
+            return;
+        }
+
+        feedContainer.className = state.viewMode === 'grid'
+            ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5'
+            : 'flex flex-col gap-3';
+
+        feedContainer.innerHTML = filtered.map(item => renderSingleFileCard(item, currentUserId)).join('');
+    }
 }
 
 function switchScreen(screenName) {
@@ -736,6 +1063,7 @@ function switchScreen(screenName) {
 function updateNavUI() {
     const userNavSection = document.getElementById('user-nav-section');
     const userEmailDisplay = document.getElementById('user-email-display');
+    const topUsernameDisplay = document.getElementById('top-username-display');
     const mainNav = document.getElementById('main-nav');
     const authScreens = ['auth', 'username-setup'];
 
@@ -744,22 +1072,27 @@ function updateNavUI() {
         if (userNavSection) userNavSection.classList.add('hidden');
     } else {
         if (mainNav) mainNav.classList.remove('hidden');
-        if (userNavSection) userNavSection.classList.remove('hidden');
+        if (userNavSection) {
+            userNavSection.classList.remove('hidden');
+            userNavSection.classList.add('flex');
+        }
+
         if (userEmailDisplay && state.currentUser) {
-            const userMetaData = state.currentUser.user_metadata || {};
-            const displayName = state.currentUser.email || userMetaData.user_name || userMetaData.preferred_username || 'Signed In';
-            userEmailDisplay.textContent = displayName;
+            userEmailDisplay.textContent = state.currentUser.email || 'Signed In';
+        }
+
+        if (topUsernameDisplay && state.currentProfile) {
+            topUsernameDisplay.textContent = `@${state.currentProfile.username.replace(/^@/, '')}`;
         }
     }
 
     const settingsUserEmail = document.getElementById('settings-user-email');
     const settingsUsername = document.getElementById('settings-username');
     if (settingsUserEmail && state.currentUser) {
-        const userMetaData = state.currentUser.user_metadata || {};
-        settingsUserEmail.textContent = state.currentUser.email || userMetaData.user_name || userMetaData.preferred_username || 'GitHub Account';
+        settingsUserEmail.textContent = state.currentUser.email || 'GitHub Account';
     }
     if (settingsUsername && state.currentProfile) {
-        settingsUsername.textContent = `@${state.currentProfile.username}`;
+        settingsUsername.textContent = `@${state.currentProfile.username.replace(/^@/, '')}`;
     }
 }
 
@@ -883,6 +1216,8 @@ function resetAddResourceForm() {
     if (form) form.reset();
     const fileNameDisplay = document.getElementById('selected-file-name');
     if (fileNameDisplay) fileNameDisplay.textContent = 'No file chosen';
+    const progressContainer = document.getElementById('upload-progress-container');
+    if (progressContainer) progressContainer.classList.add('hidden');
 }
 
 function showToast(message, type = 'info') {
@@ -920,7 +1255,7 @@ function showToast(message, type = 'info') {
     }, 4000);
 }
 
-function confirmDeleteResource(id) {
+function confirmDeleteResource(id, filePath) {
     const modal = document.getElementById('confirm-modal');
     const confirmBtn = document.getElementById('confirm-action-btn');
     const cancelBtn = document.getElementById('cancel-action-btn');
@@ -932,7 +1267,7 @@ function confirmDeleteResource(id) {
     const handleConfirm = async () => {
         modal.classList.add('hidden');
         confirmBtn.removeEventListener('click', handleConfirm);
-        await handleDeleteResource(id);
+        await handleDeleteResource(id, filePath);
     };
 
     const handleCancel = () => {
@@ -942,39 +1277,6 @@ function confirmDeleteResource(id) {
 
     confirmBtn.onclick = handleConfirm;
     cancelBtn.onclick = handleCancel;
-}
-
-function previewFile(url, title, ext) {
-    const modal = document.getElementById('preview-modal');
-    const titleEl = document.getElementById('preview-title');
-    const bodyEl = document.getElementById('preview-body');
-
-    if (!modal || !bodyEl) return;
-
-    titleEl.textContent = title;
-
-    if (['PNG', 'JPG', 'JPEG'].includes(ext)) {
-        bodyEl.innerHTML = `<img src="${url}" class="max-h-[70vh] mx-auto rounded-xl object-contain border border-slate-700" alt="Preview"/>`;
-    } else if (ext === 'PDF') {
-        bodyEl.innerHTML = `<iframe src="${url}" class="w-full h-[70vh] rounded-xl border border-slate-700"></iframe>`;
-    } else {
-        bodyEl.innerHTML = `
-            <div class="p-8 text-center bg-slate-800 rounded-xl">
-                <i class="fa-solid fa-file-arrow-down text-5xl text-indigo-400 mb-4"></i>
-                <p class="text-sm text-slate-300 mb-4">Direct inline preview is not supported for .${ext.toLowerCase()} files.</p>
-                <a href="${url}" download target="_blank" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium rounded-lg inline-flex items-center gap-2">
-                    <i class="fa-solid fa-download"></i> Download File Instead
-                </a>
-            </div>
-        `;
-    }
-
-    modal.classList.remove('hidden');
-}
-
-function closePreviewModal() {
-    const modal = document.getElementById('preview-modal');
-    if (modal) modal.classList.add('hidden');
 }
 
 function showLoading(isLoading, text = 'Processing...') {
@@ -988,6 +1290,15 @@ function showLoading(isLoading, text = 'Processing...') {
     } else {
         spinner.classList.add('hidden');
     }
+}
+
+function formatBytes(bytes, decimals = 2) {
+    if (!bytes || bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
 function escapeHTML(str) {
