@@ -32,7 +32,7 @@ const AP_SUBJECTS = [
 ];
 
 const BUCKET_NAME = 'user-files';
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.mp4', '.webm', '.ogg', '.mov', '.mp3', '.wav', '.m4a', '.pdf'];
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -144,7 +144,8 @@ async function checkInitialSession() {
         }
     });
 
-    const { data: { session } } = await state.supabase.auth.getSession();
+    const { data: { session }, error } = await state.supabase.auth.getSession();
+    if (error) showPlainError(error.message);
     if (!session) switchScreen('auth');
 }
 
@@ -152,6 +153,7 @@ async function fetchUserProfile(userId) {
     if (state.isDemoMode) return;
     try {
         const { data } = await state.supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
+        
         if (data && data.username) {
             state.currentProfile = data;
             if (['auth', 'username-setup'].includes(state.activeScreen)) {
@@ -159,7 +161,16 @@ async function fetchUserProfile(userId) {
                 await loadResources();
             }
         } else {
-            switchScreen('username-setup');
+            const fallbackHandle = state.currentUser?.user_metadata?.preferred_username || state.currentUser?.email?.split('@')[0] || `user_${userId.slice(0, 5)}`;
+            const { error: upsertErr } = await state.supabase.from('profiles').upsert({ id: userId, username: fallbackHandle, created_at: new Date().toISOString() });
+            
+            if (!upsertErr) {
+                state.currentProfile = { id: userId, username: fallbackHandle };
+                switchScreen('feed');
+                await loadResources();
+            } else {
+                switchScreen('username-setup');
+            }
         }
     } catch (e) {
         switchScreen('username-setup');
@@ -216,6 +227,35 @@ async function handleSignIn(email, password) {
     state.currentUser = data.user;
     loadSavedFileIds();
     await fetchUserProfile(data.user.id);
+}
+
+async function handleGitHubSignIn() {
+    if (state.isDemoMode) {
+        const githubUser = { id: 'user-github', email: 'github_student@example.com', username: 'github_student' };
+        state.currentUser = githubUser;
+        state.currentProfile = { username: githubUser.username };
+        localStorage.setItem('ap_hub_demo_user', JSON.stringify(githubUser));
+        loadSavedFileIds();
+        showToast('Signed in with GitHub (Demo Mode)!', 'success');
+        switchScreen('feed');
+        await loadResources();
+        updateNavUI();
+        return;
+    }
+
+    try {
+        showLoading(true, 'Connecting to GitHub...');
+        const redirectUrl = window.location.origin + window.location.pathname;
+        const { error } = await state.supabase.auth.signInWithOAuth({
+            provider: 'github',
+            options: { redirectTo: redirectUrl }
+        });
+        if (error) showPlainError(error.message);
+    } catch (err) {
+        showPlainError(err.message || 'GitHub login failed.');
+    } finally {
+        showLoading(false);
+    }
 }
 
 async function handleSignOut() {
@@ -289,15 +329,22 @@ function handleFileSelect(inputElement) {
     if (!file) return;
     const fileExt = '.' + file.name.split('.').pop().toLowerCase();
     if (file.size > MAX_FILE_SIZE_BYTES || !ALLOWED_EXTENSIONS.includes(fileExt)) {
-        showPlainError('Invalid file or size > 10 MB.');
+        showPlainError('Invalid file or size > 25 MB.');
         inputElement.value = '';
         return;
     }
     if (nameDisplay) nameDisplay.textContent = `${file.name} (${formatBytes(file.size)})`;
 }
 
+// Fixed Upload Handler with Native XHR for Reliable Real-Time Progress Events
 async function handleResourceUpload({ title, subject, tags, file }) {
-    if (!file) return showToast('Please select a file.', 'error');
+    if (!file) return showToast('Please select a file to upload.', 'error');
+
+    const submitBtn = document.getElementById('add-file-submit-btn');
+    const progressContainer = document.getElementById('upload-progress-container');
+    const progressBar = document.getElementById('upload-progress-bar');
+    const progressPercent = document.getElementById('upload-progress-percent');
+
     const timestamp = Date.now();
     const cleanFileName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
     const filePath = `${state.currentUser?.id || 'demo'}/${timestamp}-${cleanFileName}`;
@@ -319,14 +366,57 @@ async function handleResourceUpload({ title, subject, tags, file }) {
         state.demoResources.unshift(newRes);
         saveDemoResources();
         state.resources.unshift(newRes);
+        resetAddResourceForm();
         switchScreen('feed');
         renderAllViews();
         return;
     }
 
     try {
-        const { error: storageError } = await state.supabase.storage.from(BUCKET_NAME).upload(filePath, file);
-        if (storageError) throw storageError;
+        if (submitBtn) submitBtn.disabled = true;
+        if (progressContainer) progressContainer.classList.remove('hidden');
+        if (progressBar) progressBar.style.width = '0%';
+        if (progressPercent) progressPercent.textContent = '0%';
+
+        const { data: sessionData } = await state.supabase.auth.getSession();
+        const accessToken = sessionData?.session?.access_token;
+
+        if (!accessToken) throw new Error('User session expired. Please sign in again.');
+
+        const uploadUrl = `${window.SUPABASE_URL}/storage/v1/object/${BUCKET_NAME}/${filePath}`;
+
+        // Native XHR for Upload Progress Monitoring
+        await new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', uploadUrl, true);
+            xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
+            xhr.setRequestHeader('apikey', window.SUPABASE_ANON_KEY);
+            xhr.setRequestHeader('x-upsert', 'false');
+
+            xhr.upload.onprogress = (event) => {
+                if (event.lengthComputable) {
+                    const percent = Math.min(100, Math.round((event.loaded / event.total) * 100));
+                    if (progressBar) progressBar.style.width = `${percent}%`;
+                    if (progressPercent) progressPercent.textContent = `${percent}%`;
+                }
+            };
+
+            xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    resolve();
+                } else {
+                    try {
+                        const errJson = JSON.parse(xhr.responseText);
+                        reject(new Error(errJson.message || errJson.error || 'Upload failed.'));
+                    } catch (e) {
+                        reject(new Error(`Upload failed with status ${xhr.status}`));
+                    }
+                }
+            };
+
+            xhr.onerror = () => reject(new Error('Network error during file upload.'));
+            xhr.send(file);
+        });
 
         const { data: signedData } = await state.supabase.storage.from(BUCKET_NAME).createSignedUrl(filePath, 3600 * 24 * 365);
         const { error: dbError } = await state.supabase.from('resources').insert({
@@ -341,13 +431,18 @@ async function handleResourceUpload({ title, subject, tags, file }) {
             file_path: filePath,
             created_at: new Date().toISOString()
         });
+
         if (dbError) throw dbError;
 
-        showToast('File published!', 'success');
+        showToast('File published successfully!', 'success');
+        resetAddResourceForm();
         switchScreen('feed');
         await loadResources();
     } catch (error) {
-        showPlainError(error.message);
+        showPlainError(error.message || 'Error uploading file.');
+    } finally {
+        if (submitBtn) submitBtn.disabled = false;
+        if (progressContainer) progressContainer.classList.add('hidden');
     }
 }
 
@@ -368,7 +463,6 @@ async function handleDeleteResource(resourceId, filePath) {
     }
 }
 
-// Requirement 2 & 3: Dedicated Search Page Keyword / Subject Filter logic
 function getFilteredSearchResults() {
     return state.resources.filter(res => {
         const matchesSubject = state.selectedSubject === 'ALL' || res.subject === state.selectedSubject;
@@ -445,7 +539,6 @@ function renderHomeView() {
     if (myFilesContainer) myFilesContainer.innerHTML = myFiles.length ? myFiles.map(renderSingleFileCard).join('') : '<p class="text-xs text-slate-500 col-span-full py-4 text-center">You haven\'t uploaded any files yet.</p>';
 }
 
-// Requirement 3: Dedicated Search Page rendering without returning to Home
 function renderSearchView() {
     const container = document.getElementById('search-results-container');
     const countEl = document.getElementById('search-results-count');
@@ -457,7 +550,6 @@ function renderSearchView() {
     container.innerHTML = results.length ? results.map(renderSingleFileCard).join('') : '<p class="text-xs text-slate-500 col-span-full py-8 text-center">No files match your search criteria.</p>';
 }
 
-// Requirement 4: Community Resources Page - Top 10 most recent per AP subject
 function renderCommunityView() {
     const wrapper = document.getElementById('community-subjects-wrapper');
     if (!wrapper) return;
@@ -505,6 +597,7 @@ function updateNavUI() {
 function setupEventListeners() {
     document.getElementById('signin-btn')?.addEventListener('click', () => handleSignIn(document.getElementById('auth-email').value, document.getElementById('auth-password').value));
     document.getElementById('signup-btn')?.addEventListener('click', () => handleSignUp(document.getElementById('auth-email').value, document.getElementById('auth-password').value));
+    document.getElementById('github-signin-btn')?.addEventListener('click', handleGitHubSignIn);
     document.getElementById('username-form')?.addEventListener('submit', (e) => { e.preventDefault(); handleUsernameSetup(document.getElementById('setup-username-input').value); });
     document.getElementById('signout-btn')?.addEventListener('click', handleSignOut);
 
@@ -550,6 +643,15 @@ function filterBySubject(subj) {
     renderSearchView();
 }
 
+function resetAddResourceForm() {
+    const form = document.getElementById('add-resource-form');
+    if (form) form.reset();
+    const nameDisplay = document.getElementById('selected-file-name');
+    if (nameDisplay) nameDisplay.textContent = 'No file chosen';
+    const progressContainer = document.getElementById('upload-progress-container');
+    if (progressContainer) progressContainer.classList.add('hidden');
+}
+
 function showToast(msg, type = 'info') {
     const container = document.getElementById('toast-container');
     if (!container) return;
@@ -566,6 +668,18 @@ function confirmDeleteResource(id, filePath) {
     modal.classList.remove('hidden');
     document.getElementById('confirm-action-btn').onclick = async () => { modal.classList.add('hidden'); await handleDeleteResource(id, filePath); };
     document.getElementById('cancel-action-btn').onclick = () => modal.classList.add('hidden');
+}
+
+function showLoading(isLoading, text = 'Processing...') {
+    const spinner = document.getElementById('loading-overlay');
+    const loadingText = document.getElementById('loading-text');
+    if (!spinner) return;
+    if (isLoading) {
+        if (loadingText) loadingText.textContent = text;
+        spinner.classList.remove('hidden');
+    } else {
+        spinner.classList.add('hidden');
+    }
 }
 
 function formatBytes(bytes) {
