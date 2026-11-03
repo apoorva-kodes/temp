@@ -33,7 +33,7 @@
     <header class="sticky top-0 z-40 bg-slate-900/80 backdrop-blur-md border-b border-slate-800">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
             
-            <!-- Brand Logo + Community Resources Button -->
+            <!-- Brand Logo + Community Resources Button + Admin Toggle -->
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-3 cursor-pointer" onclick="switchScreen('feed')">
                     <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
@@ -50,6 +50,14 @@
                 <button onclick="switchScreen('community')" class="px-3 py-1.5 text-xs font-semibold bg-indigo-950/80 hover:bg-indigo-900 text-indigo-300 border border-indigo-700/60 rounded-xl transition-all flex items-center gap-2 shadow-sm">
                     <i class="fa-solid fa-users text-indigo-400"></i> Browse Community Resources
                 </button>
+
+                <!-- Admin View Toggle Switch (Visible only to logged in Admins) -->
+                <div id="admin-toggle-wrapper" class="hidden flex items-center gap-2 border-l border-slate-800 pl-4">
+                    <span class="text-xs font-medium text-slate-400">Admin Mode</span>
+                    <button id="admin-toggle-btn" onclick="toggleAdminViewMode()" class="w-11 h-6 bg-slate-700 rounded-full p-1 transition-colors duration-200 ease-in-out focus:outline-none">
+                        <div id="admin-toggle-circle" class="w-4 h-4 bg-white rounded-full transition-transform duration-200 ease-in-out"></div>
+                    </button>
+                </div>
             </div>
 
             <!-- User Status & Top Page Username Display -->
@@ -313,6 +321,103 @@
             </div>
         </section>
 
+        <!-- SCREEN 7: Main Admin Panel Screen -->
+        <section id="screen-admin-panel" class="app-screen hidden space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <!-- Sidebar -->
+                <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4">
+                    <h3 class="text-sm font-bold text-indigo-400 uppercase tracking-wider">Admin Controls</h3>
+                    <div class="space-y-2">
+                        <button onclick="openAddModeratorModal()" class="w-full px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl transition-all flex items-center gap-2">
+                            <i class="fa-solid fa-user-plus"></i> Add Moderator
+                        </button>
+                        <button onclick="switchScreen('messages')" class="w-full px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition-all flex items-center gap-2 border border-slate-700">
+                            <i class="fa-solid fa-comments"></i> Messages Page
+                        </button>
+                        <button onclick="switchScreen('reports')" class="w-full px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-amber-400 text-xs font-semibold rounded-xl transition-all flex items-center gap-2 border border-slate-700">
+                            <i class="fa-solid fa-flag"></i> Unresolved Reports
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Main registered users list -->
+                <div class="md:col-span-3 bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4">
+                    <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+                        <h2 class="text-xl font-bold text-white">Registered Users</h2>
+                        <span id="admin-user-count" class="text-xs text-slate-400 font-medium">Loading users...</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs text-slate-300">
+                            <thead class="bg-slate-950 text-slate-400 uppercase border-b border-slate-800">
+                                <tr>
+                                    <th class="p-3">User ID</th>
+                                    <th class="p-3">Username</th>
+                                    <th class="p-3">Uploaded Files</th>
+                                    <th class="p-3">Flagged Recently</th>
+                                    <th class="p-3">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-users-table-body" class="divide-y divide-slate-800">
+                                <tr><td colspan="5" class="p-4 text-center text-slate-500">Loading user records...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCREEN 8: Reports View -->
+        <section id="screen-reports" class="app-screen hidden space-y-6">
+            <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4">
+                <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+                    <div>
+                        <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-flag text-amber-400"></i> Unresolved Reports
+                        </h2>
+                        <p class="text-xs text-slate-400">Review moderation reports submitted by moderators</p>
+                    </div>
+                    <button onclick="switchScreen('admin-panel')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">
+                        <i class="fa-solid fa-arrow-left mr-1"></i> Back to Admin Panel
+                    </button>
+                </div>
+                <div id="reports-list-container" class="space-y-3">
+                    <p class="text-xs text-slate-500 py-4 text-center">Loading unresolved reports...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCREEN 9: Messages View -->
+        <section id="screen-messages" class="app-screen hidden max-w-4xl mx-auto py-4">
+            <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-2xl">
+                <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+                    <div>
+                        <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-comments text-indigo-400"></i> Admin & Moderator Messaging
+                        </h2>
+                        <p class="text-xs text-slate-400">Communicate directly with staff and community users</p>
+                    </div>
+                    <button onclick="switchScreen('admin-panel')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">
+                        <i class="fa-solid fa-arrow-left mr-1"></i> Back to Admin
+                    </button>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 h-96">
+                    <div class="border-r border-slate-800 pr-4 space-y-2 overflow-y-auto" id="msg-users-list">
+                        <p class="text-xs text-slate-500">Loading conversation list...</p>
+                    </div>
+                    <div class="md:col-span-2 flex flex-col justify-between bg-slate-950 rounded-2xl p-4 border border-slate-800">
+                        <div id="msg-history-container" class="flex-1 overflow-y-auto space-y-3 pr-2">
+                            <p class="text-xs text-slate-500 text-center py-10">Select a user to view message thread</p>
+                        </div>
+                        <div class="pt-3 flex gap-2 border-t border-slate-800">
+                            <input type="text" id="msg-input" placeholder="Type message..." class="flex-1 px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                            <button onclick="sendChatMessage()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl">Send</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
     </main>
 
     <!-- Confirm Modal -->
@@ -328,6 +433,21 @@
             <div class="flex gap-2.5 pt-2">
                 <button id="cancel-action-btn" class="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">Cancel</button>
                 <button id="confirm-action-btn" class="flex-1 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold rounded-xl">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Moderator Modal -->
+    <div id="add-mod-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl">
+            <h3 class="text-base font-bold text-slate-100">Add Moderator</h3>
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">User ID (UUID)</label>
+                <input type="text" id="add-mod-userid-input" placeholder="e.g. 123e4567-e89b-12d3-a456-426614174000" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-none">
+            </div>
+            <div class="flex gap-2 pt-2">
+                <button onclick="closeAddModeratorModal()" class="flex-1 py-2 bg-slate-800 text-slate-300 text-xs font-semibold rounded-xl">Cancel</button>
+                <button onclick="submitAddModerator()" class="flex-1 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-xl">Add</button>
             </div>
         </div>
     </div>

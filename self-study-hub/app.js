@@ -8,12 +8,15 @@ const state = {
     currentProfile: null,
     resources: [],
     savedFileIds: [],
-    activeScreen: 'auth',   // 'auth', 'username-setup', 'feed', 'search', 'community', 'add-resource'
+    activeScreen: 'auth',   // 'auth', 'username-setup', 'feed', 'search', 'community', 'add-resource', 'admin-panel', 'reports', 'messages'
     searchQuery: '',
     selectedSubject: 'ALL',
     selectedTag: 'ALL',
     isDemoMode: false,
-    demoResources: []
+    demoResources: [],
+    isAdmin: false,
+    adminViewActive: false,
+    selectedChatUserId: null
 };
 
 const AP_SUBJECTS = [
@@ -122,6 +125,7 @@ async function checkInitialSession() {
             state.currentUser = userObj;
             state.currentProfile = { username: userObj.username || 'demo_user' };
             loadSavedFileIds();
+            await checkAdminRole(userObj.id);
             switchScreen('feed');
             await loadResources();
         } else {
@@ -136,9 +140,11 @@ async function checkInitialSession() {
             state.currentUser = session.user;
             loadSavedFileIds();
             await fetchUserProfile(session.user.id);
+            await checkAdminRole(session.user.id);
         } else {
             state.currentUser = null;
             state.currentProfile = null;
+            state.isAdmin = false;
             switchScreen('auth');
             updateNavUI();
         }
@@ -147,6 +153,60 @@ async function checkInitialSession() {
     const { data: { session }, error } = await state.supabase.auth.getSession();
     if (error) showPlainError(error.message);
     if (!session) switchScreen('auth');
+}
+
+async function checkAdminRole(userId) {
+    if (state.isDemoMode) {
+        state.isAdmin = true;
+        updateAdminToggleUI();
+        return;
+    }
+    try {
+        const { data, error } = await state.supabase
+            .from('admins')
+            .select('user_id')
+            .eq('user_id', userId)
+            .maybeSingle();
+
+        if (data) {
+            state.isAdmin = true;
+        } else {
+            state.isAdmin = false;
+        }
+    } catch (e) {
+        state.isAdmin = false;
+    }
+    updateAdminToggleUI();
+}
+
+function updateAdminToggleUI() {
+    const wrapper = document.getElementById('admin-toggle-wrapper');
+    if (state.isAdmin) {
+        wrapper?.classList.remove('hidden');
+    } else {
+        wrapper?.classList.add('hidden');
+    }
+}
+
+function toggleAdminViewMode() {
+    if (!state.isAdmin) return;
+    state.adminViewActive = !state.adminViewActive;
+    
+    const btn = document.getElementById('admin-toggle-btn');
+    const circle = document.getElementById('admin-toggle-circle');
+
+    if (state.adminViewActive) {
+        btn?.classList.remove('bg-slate-700');
+        btn?.classList.add('bg-emerald-500');
+        circle?.classList.add('translate-x-5');
+        switchScreen('admin-panel');
+        loadAdminPanelData();
+    } else {
+        btn?.classList.remove('bg-emerald-500');
+        btn?.classList.add('bg-slate-700');
+        circle?.classList.remove('translate-x-5');
+        switchScreen('feed');
+    }
 }
 
 async function fetchUserProfile(userId) {
@@ -217,6 +277,7 @@ async function handleSignIn(email, password) {
         state.currentProfile = { username: userObj.username };
         localStorage.setItem('ap_hub_demo_user', JSON.stringify(userObj));
         loadSavedFileIds();
+        await checkAdminRole(userObj.id);
         switchScreen('feed');
         await loadResources();
         updateNavUI();
@@ -227,6 +288,7 @@ async function handleSignIn(email, password) {
     state.currentUser = data.user;
     loadSavedFileIds();
     await fetchUserProfile(data.user.id);
+    await checkAdminRole(data.user.id);
 }
 
 async function handleGitHubSignIn() {
@@ -263,6 +325,8 @@ async function handleSignOut() {
     localStorage.removeItem('ap_hub_demo_user');
     state.currentUser = null;
     state.currentProfile = null;
+    state.isAdmin = false;
+    state.adminViewActive = false;
     switchScreen('auth');
     updateNavUI();
 }
@@ -512,7 +576,7 @@ function renderSingleFileCard(item) {
                 <span class="truncate font-semibold text-indigo-300">@${escapeHTML(item.username)}</span>
                 <div class="flex items-center gap-1.5">
                     <a href="${escapeHTML(item.file_url)}" download="${escapeHTML(item.file_name)}" target="_blank" class="px-2 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[11px] font-medium"><i class="fa-solid fa-download"></i> Download</a>
-                    ${isOwner ? `<button onclick="confirmDeleteResource('${item.id}', '${escapeHTML(item.file_path || '')}')" class="p-1 text-rose-400 hover:bg-rose-950/60 rounded-lg"><i class="fa-solid fa-trash-can"></i></button>` : ''}
+                    ${(isOwner || state.isAdmin) ? `<button onclick="confirmDeleteResource('${item.id}', '${escapeHTML(item.file_path || '')}')" class="p-1 text-rose-400 hover:bg-rose-950/60 rounded-lg"><i class="fa-solid fa-trash-can"></i></button>` : ''}
                 </div>
             </div>
         </div>
@@ -575,11 +639,20 @@ function renderCommunityView() {
 }
 
 function switchScreen(screenName) {
+    if (['admin-panel', 'reports', 'messages'].includes(screenName) && !state.isAdmin) {
+        showToast('Access denied: Admin permissions required.', 'error');
+        screenName = 'feed';
+    }
+
     state.activeScreen = screenName;
     document.querySelectorAll('.app-screen').forEach(el => el.classList.add('hidden'));
     document.getElementById(`screen-${screenName}`)?.classList.remove('hidden');
     window.scrollTo({ top: 0, behavior: 'smooth' });
     updateNavUI();
+
+    if (screenName === 'admin-panel') loadAdminPanelData();
+    if (screenName === 'reports') loadUnresolvedReports();
+    if (screenName === 'messages') loadMessagesScreen();
 }
 
 function updateNavUI() {
@@ -690,4 +763,235 @@ function formatBytes(bytes) {
 
 function escapeHTML(str) {
     return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/* ==========================================================================
+   Admin Panel & Moderation Communications Logic
+   ========================================================================== */
+
+async function loadAdminPanelData() {
+    const tbody = document.getElementById('admin-users-table-body');
+    const countEl = document.getElementById('admin-user-count');
+    if (!tbody) return;
+
+    if (state.isDemoMode) {
+        if (countEl) countEl.textContent = 'Total users: 2 (Demo Mode)';
+        tbody.innerHTML = `
+            <tr>
+                <td class="p-3 font-mono text-[11px]">user-demo</td>
+                <td class="p-3 font-semibold">@${escapeHTML(state.currentProfile?.username || 'demo')}</td>
+                <td class="p-3">Gauss_Law_FRQ_Solutions.pdf</td>
+                <td class="p-3"><span class="px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">No</span></td>
+                <td class="p-3"><button class="px-2 py-1 bg-slate-800 text-slate-400 rounded cursor-not-allowed">Admin</button></td>
+            </tr>
+        `;
+        return;
+    }
+
+    try {
+        const { data: users, error: userErr } = await state.supabase.from('profiles').select('*');
+        if (userErr) throw userErr;
+
+        const { data: resources } = await state.supabase.from('resources').select('id, user_id, file_name');
+        const { data: reports } = await state.supabase.from('reports').select('target_user_id, status').eq('status', 'unresolved');
+
+        const reportedUserIds = new Set((reports || []).map(r => r.target_user_id));
+
+        if (countEl) countEl.textContent = `Total users: ${users.length}`;
+
+        tbody.innerHTML = users.map(u => {
+            const userFiles = (resources || []).filter(r => r.user_id === u.id).map(r => r.file_name).join(', ') || 'No files';
+            const isFlagged = reportedUserIds.has(u.id);
+
+            return `
+                <tr>
+                    <td class="p-3 font-mono text-[10px] text-slate-400">${u.id}</td>
+                    <td class="p-3 font-semibold text-slate-200">@${escapeHTML(u.username || 'User')}</td>
+                    <td class="p-3 truncate max-w-xs text-slate-400" title="${escapeHTML(userFiles)}">${escapeHTML(userFiles)}</td>
+                    <td class="p-3">
+                        <span class="px-2 py-0.5 rounded text-[10px] font-semibold ${isFlagged ? 'bg-rose-950 text-rose-400 border border-rose-800' : 'bg-emerald-950 text-emerald-400 border border-emerald-800'}">
+                            ${isFlagged ? 'Yes (Flagged)' : 'No'}
+                        </span>
+                    </td>
+                    <td class="p-3">
+                        <button onclick="banUserAction('${u.id}')" class="px-2 py-1 bg-rose-600/20 hover:bg-rose-600 text-rose-300 border border-rose-700/60 rounded text-[11px]">Ban / Delete</button>
+                    </td>
+                </tr>
+            `;
+        }).join('') || '<tr><td colspan="5" class="p-4 text-center text-slate-500">No users found.</td></tr>';
+
+    } catch (err) {
+        showPlainError(err.message || 'Failed to load registered users.');
+    }
+}
+
+function openAddModeratorModal() {
+    document.getElementById('add-mod-modal')?.classList.remove('hidden');
+}
+
+function closeAddModeratorModal() {
+    document.getElementById('add-mod-modal')?.classList.add('hidden');
+}
+
+async function submitAddModerator() {
+    const input = document.getElementById('add-mod-userid-input');
+    const userId = input ? input.value.trim() : '';
+    if (!userId) return showToast('Please enter a User ID', 'error');
+
+    if (state.isDemoMode) {
+        showToast('Moderator added (Demo Mode)!', 'success');
+        closeAddModeratorModal();
+        return;
+    }
+
+    try {
+        const { error } = await state.supabase.from('moderators').insert({ user_id: userId });
+        if (error) throw error;
+        showToast('Moderator added successfully!', 'success');
+        closeAddModeratorModal();
+    } catch (err) {
+        showPlainError(err.message || 'Failed to add moderator.');
+    }
+}
+
+async function banUserAction(userId) {
+    if (!confirm('Are you sure you want to ban/delete this user profile?')) return;
+    if (state.isDemoMode) {
+        showToast('User banned (Demo Mode)!', 'info');
+        return;
+    }
+
+    try {
+        const { error } = await state.supabase.from('profiles').delete().eq('id', userId);
+        if (error) throw error;
+        showToast('User profile deleted.', 'success');
+        await loadAdminPanelData();
+    } catch (err) {
+        showPlainError(err.message || 'Failed to delete user.');
+    }
+}
+
+async function loadUnresolvedReports() {
+    const container = document.getElementById('reports-list-container');
+    if (!container) return;
+
+    if (state.isDemoMode) {
+        container.innerHTML = '<div class="p-4 bg-slate-950 rounded-xl text-xs text-slate-400">Demo Mode: No unresolved reports available.</div>';
+        return;
+    }
+
+    try {
+        const { data: reports, error } = await state.supabase.from('reports').select('*').eq('status', 'unresolved');
+        if (error) throw error;
+
+        container.innerHTML = (reports || []).map(r => `
+            <div class="p-3 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-between text-xs">
+                <div>
+                    <span class="font-bold text-rose-400">Target User:</span> ${r.target_user_id}
+                    <p class="text-slate-400 mt-1">Reason: ${escapeHTML(r.reason)}</p>
+                </div>
+                <button onclick="resolveReport('${r.id}')" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg">Resolve</button>
+            </div>
+        `).join('') || '<p class="text-xs text-slate-500 py-4 text-center">No unresolved reports.</p>';
+
+    } catch (err) {
+        showPlainError(err.message || 'Failed to load unresolved reports.');
+    }
+}
+
+async function resolveReport(reportId) {
+    try {
+        const { error } = await state.supabase.from('reports').update({ status: 'resolved' }).eq('id', reportId);
+        if (error) throw error;
+        showToast('Report resolved.', 'success');
+        await loadUnresolvedReports();
+    } catch (err) {
+        showPlainError(err.message);
+    }
+}
+
+async function loadMessagesScreen() {
+    const listEl = document.getElementById('msg-users-list');
+    if (!listEl) return;
+
+    if (state.isDemoMode) {
+        listEl.innerHTML = '<div class="p-2 text-xs text-indigo-400 cursor-pointer bg-slate-800 rounded-lg">@Mr. Deal</div>';
+        state.selectedChatUserId = 'user-deal';
+        renderMessageHistory();
+        return;
+    }
+
+    try {
+        const { data: profiles } = await state.supabase.from('profiles').select('id, username');
+        listEl.innerHTML = (profiles || []).map(p => `
+            <div onclick="selectChatUser('${p.id}')" class="p-2 text-xs text-slate-300 hover:bg-slate-800 rounded-lg cursor-pointer flex items-center justify-between">
+                <span>@${escapeHTML(p.username || 'User')}</span>
+            </div>
+        `).join('') || '<p class="text-xs text-slate-500">No users found.</p>';
+    } catch (err) {
+        showPlainError(err.message);
+    }
+}
+
+function selectChatUser(userId) {
+    state.selectedChatUserId = userId;
+    renderMessageHistory();
+}
+
+async function renderMessageHistory() {
+    const historyEl = document.getElementById('msg-history-container');
+    if (!historyEl || !state.selectedChatUserId) return;
+
+    if (state.isDemoMode) {
+        historyEl.innerHTML = `<div class="p-2 bg-indigo-900/40 rounded-xl text-xs text-indigo-200">Hello admin! Please check the physics notes.</div>`;
+        return;
+    }
+
+    try {
+        const { data: messages, error } = await state.supabase
+            .from('messages')
+            .select('*')
+            .or(`and(sender_id.eq.${state.currentUser.id},receiver_id.eq.${state.selectedChatUserId}),and(sender_id.eq.${state.selectedChatUserId},receiver_id.eq.${state.currentUser.id})`)
+            .order('created_at', { ascending: true });
+
+        if (error) throw error;
+
+        historyEl.innerHTML = (messages || []).map(m => {
+            const isMe = m.sender_id === state.currentUser.id;
+            return `
+                <div class="flex ${isMe ? 'justify-end' : 'justify-start'}">
+                    <div class="max-w-xs px-3 py-2 rounded-xl text-xs ${isMe ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-200'}">
+                        ${escapeHTML(m.content)}
+                    </div>
+                </div>
+            `;
+        }).join('') || '<p class="text-xs text-slate-500 text-center py-6">No messages yet.</p>';
+    } catch (err) {
+        showPlainError(err.message);
+    }
+}
+
+async function sendChatMessage() {
+    const input = document.getElementById('msg-input');
+    const content = input ? input.value.trim() : '';
+    if (!content || !state.selectedChatUserId) return;
+
+    if (state.isDemoMode) {
+        input.value = '';
+        renderMessageHistory();
+        return;
+    }
+
+    try {
+        const { error } = await state.supabase.from('messages').insert({
+            sender_id: state.currentUser.id,
+            receiver_id: state.selectedChatUserId,
+            content
+        });
+        if (error) throw error;
+        input.value = '';
+        await renderMessageHistory();
+    } catch (err) {
+        showPlainError(err.message);
+    }
 }
