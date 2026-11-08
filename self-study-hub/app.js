@@ -129,6 +129,7 @@ async function checkInitialSession() {
             state.currentProfile = { username: userObj.username || 'demo_user' };
             loadSavedFileIds();
             await checkUserRoles(userObj.id);
+            subscribeToIncomingMessages();
             switchScreen('feed');
             await loadResources();
         } else {
@@ -144,6 +145,7 @@ async function checkInitialSession() {
             loadSavedFileIds();
             await fetchUserProfile(session.user.id);
             await checkUserRoles(session.user.id);
+            subscribeToIncomingMessages();
         } else {
             state.currentUser = null;
             state.currentProfile = null;
@@ -157,6 +159,29 @@ async function checkInitialSession() {
     const { data: { session }, error } = await state.supabase.auth.getSession();
     if (error) showPlainError(error.message);
     if (!session) switchScreen('auth');
+}
+
+function subscribeToIncomingMessages() {
+    if (!state.currentUser || state.isDemoMode || !state.supabase) return;
+
+    state.supabase
+        .channel('public:messages')
+        .on(
+            'postgres_changes',
+            {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'messages',
+                filter: `receiver_id=eq.${state.currentUser.id}`
+            },
+            (payload) => {
+                showToast(`New message received!`, 'info');
+                if (state.activeScreen === 'messages') {
+                    renderMessageHistory();
+                }
+            }
+        )
+        .subscribe();
 }
 
 async function checkUserRoles(userId) {
@@ -314,6 +339,7 @@ async function handleSignIn(email, password) {
         localStorage.setItem('ap_hub_demo_user', JSON.stringify(userObj));
         loadSavedFileIds();
         await checkUserRoles(userObj.id);
+        subscribeToIncomingMessages();
         switchScreen('feed');
         await loadResources();
         updateNavUI();
@@ -325,6 +351,7 @@ async function handleSignIn(email, password) {
     loadSavedFileIds();
     await fetchUserProfile(data.user.id);
     await checkUserRoles(data.user.id);
+    subscribeToIncomingMessages();
 }
 
 async function handleGitHubSignIn() {
@@ -681,7 +708,7 @@ function switchScreen(screenName) {
         showToast('Access denied: Admin permissions required.', 'error');
         screenName = 'feed';
     } else if (['reports', 'messages'].includes(screenName) && !state.isAdmin && !state.isModerator) {
-        showToast('Access denied: Admin or Moderator permissions required.', 'error');
+        showToast('Access denied: Staff permissions required.', 'error');
         screenName = 'feed';
     }
 
