@@ -15,8 +15,11 @@ const state = {
     isDemoMode: false,
     demoResources: [],
     isAdmin: false,
+    isModerator: false,
     adminViewActive: false,
-    selectedChatUserId: null
+    modViewActive: false,
+    selectedChatUserId: null,
+    allProfilesCache: []
 };
 
 const AP_SUBJECTS = [
@@ -125,7 +128,7 @@ async function checkInitialSession() {
             state.currentUser = userObj;
             state.currentProfile = { username: userObj.username || 'demo_user' };
             loadSavedFileIds();
-            await checkAdminRole(userObj.id);
+            await checkUserRoles(userObj.id);
             switchScreen('feed');
             await loadResources();
         } else {
@@ -140,11 +143,12 @@ async function checkInitialSession() {
             state.currentUser = session.user;
             loadSavedFileIds();
             await fetchUserProfile(session.user.id);
-            await checkAdminRole(session.user.id);
+            await checkUserRoles(session.user.id);
         } else {
             state.currentUser = null;
             state.currentProfile = null;
             state.isAdmin = false;
+            state.isModerator = false;
             switchScreen('auth');
             updateNavUI();
         }
@@ -155,37 +159,50 @@ async function checkInitialSession() {
     if (!session) switchScreen('auth');
 }
 
-async function checkAdminRole(userId) {
+async function checkUserRoles(userId) {
     if (state.isDemoMode) {
         state.isAdmin = true;
-        updateAdminToggleUI();
+        state.isModerator = true;
+        updateRoleTogglesUI();
         return;
     }
+
     try {
-        const { data, error } = await state.supabase
+        const { data: adminData } = await state.supabase
             .from('admins')
             .select('user_id')
             .eq('user_id', userId)
             .maybeSingle();
 
-        if (data) {
-            state.isAdmin = true;
-        } else {
-            state.isAdmin = false;
-        }
+        state.isAdmin = !!adminData;
     } catch (e) {
         state.isAdmin = false;
     }
-    updateAdminToggleUI();
+
+    try {
+        const { data: modData } = await state.supabase
+            .from('moderators')
+            .select('user_id')
+            .eq('user_id', userId)
+            .maybeSingle();
+
+        state.isModerator = !!modData;
+    } catch (e) {
+        state.isModerator = false;
+    }
+
+    updateRoleTogglesUI();
 }
 
-function updateAdminToggleUI() {
-    const wrapper = document.getElementById('admin-toggle-wrapper');
-    if (state.isAdmin) {
-        wrapper?.classList.remove('hidden');
-    } else {
-        wrapper?.classList.add('hidden');
-    }
+function updateRoleTogglesUI() {
+    const adminWrapper = document.getElementById('admin-toggle-wrapper');
+    const modWrapper = document.getElementById('mod-toggle-wrapper');
+
+    if (state.isAdmin) adminWrapper?.classList.remove('hidden');
+    else adminWrapper?.classList.add('hidden');
+
+    if (state.isModerator) modWrapper?.classList.remove('hidden');
+    else modWrapper?.classList.add('hidden');
 }
 
 function toggleAdminViewMode() {
@@ -200,9 +217,28 @@ function toggleAdminViewMode() {
         btn?.classList.add('bg-emerald-500');
         circle?.classList.add('translate-x-5');
         switchScreen('admin-panel');
-        loadAdminPanelData();
     } else {
         btn?.classList.remove('bg-emerald-500');
+        btn?.classList.add('bg-slate-700');
+        circle?.classList.remove('translate-x-5');
+        switchScreen('feed');
+    }
+}
+
+function toggleModViewMode() {
+    if (!state.isModerator) return;
+    state.modViewActive = !state.modViewActive;
+    
+    const btn = document.getElementById('mod-toggle-btn');
+    const circle = document.getElementById('mod-toggle-circle');
+
+    if (state.modViewActive) {
+        btn?.classList.remove('bg-slate-700');
+        btn?.classList.add('bg-amber-500');
+        circle?.classList.add('translate-x-5');
+        switchScreen('reports');
+    } else {
+        btn?.classList.remove('bg-amber-500');
         btn?.classList.add('bg-slate-700');
         circle?.classList.remove('translate-x-5');
         switchScreen('feed');
@@ -277,7 +313,7 @@ async function handleSignIn(email, password) {
         state.currentProfile = { username: userObj.username };
         localStorage.setItem('ap_hub_demo_user', JSON.stringify(userObj));
         loadSavedFileIds();
-        await checkAdminRole(userObj.id);
+        await checkUserRoles(userObj.id);
         switchScreen('feed');
         await loadResources();
         updateNavUI();
@@ -288,7 +324,7 @@ async function handleSignIn(email, password) {
     state.currentUser = data.user;
     loadSavedFileIds();
     await fetchUserProfile(data.user.id);
-    await checkAdminRole(data.user.id);
+    await checkUserRoles(data.user.id);
 }
 
 async function handleGitHubSignIn() {
@@ -326,7 +362,9 @@ async function handleSignOut() {
     state.currentUser = null;
     state.currentProfile = null;
     state.isAdmin = false;
+    state.isModerator = false;
     state.adminViewActive = false;
+    state.modViewActive = false;
     switchScreen('auth');
     updateNavUI();
 }
@@ -576,7 +614,7 @@ function renderSingleFileCard(item) {
                 <span class="truncate font-semibold text-indigo-300">@${escapeHTML(item.username)}</span>
                 <div class="flex items-center gap-1.5">
                     <a href="${escapeHTML(item.file_url)}" download="${escapeHTML(item.file_name)}" target="_blank" class="px-2 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[11px] font-medium"><i class="fa-solid fa-download"></i> Download</a>
-                    ${(isOwner || state.isAdmin) ? `<button onclick="confirmDeleteResource('${item.id}', '${escapeHTML(item.file_path || '')}')" class="p-1 text-rose-400 hover:bg-rose-950/60 rounded-lg"><i class="fa-solid fa-trash-can"></i></button>` : ''}
+                    ${(isOwner || state.isAdmin || state.isModerator) ? `<button onclick="confirmDeleteResource('${item.id}', '${escapeHTML(item.file_path || '')}')" class="p-1 text-rose-400 hover:bg-rose-950/60 rounded-lg"><i class="fa-solid fa-trash-can"></i></button>` : ''}
                 </div>
             </div>
         </div>
@@ -639,8 +677,11 @@ function renderCommunityView() {
 }
 
 function switchScreen(screenName) {
-    if (['admin-panel', 'reports', 'messages'].includes(screenName) && !state.isAdmin) {
+    if (screenName === 'admin-panel' && !state.isAdmin) {
         showToast('Access denied: Admin permissions required.', 'error');
+        screenName = 'feed';
+    } else if (['reports', 'messages'].includes(screenName) && !state.isAdmin && !state.isModerator) {
+        showToast('Access denied: Admin or Moderator permissions required.', 'error');
         screenName = 'feed';
     }
 
@@ -813,8 +854,9 @@ async function loadAdminPanelData() {
                             ${isFlagged ? 'Yes (Flagged)' : 'No'}
                         </span>
                     </td>
-                    <td class="p-3">
-                        <button onclick="banUserAction('${u.id}')" class="px-2 py-1 bg-rose-600/20 hover:bg-rose-600 text-rose-300 border border-rose-700/60 rounded text-[11px]">Ban / Delete</button>
+                    <td class="p-3 flex items-center gap-1.5">
+                        <button onclick="openChatWithUser('${u.id}')" class="px-2 py-1 bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 border border-indigo-700/60 rounded text-[11px]"><i class="fa-solid fa-comment mr-1"></i> Message</button>
+                        <button onclick="banUserAction('${u.id}')" class="px-2 py-1 bg-rose-600/20 hover:bg-rose-600 text-rose-300 border border-rose-700/60 rounded text-[11px]">Ban</button>
                     </td>
                 </tr>
             `;
@@ -890,7 +932,10 @@ async function loadUnresolvedReports() {
                     <span class="font-bold text-rose-400">Target User:</span> ${r.target_user_id}
                     <p class="text-slate-400 mt-1">Reason: ${escapeHTML(r.reason)}</p>
                 </div>
-                <button onclick="resolveReport('${r.id}')" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg">Resolve</button>
+                <div class="flex items-center gap-2">
+                    <button onclick="openChatWithUser('${r.target_user_id}')" class="px-3 py-1 bg-slate-800 text-slate-300 rounded-lg">Message</button>
+                    <button onclick="resolveReport('${r.id}')" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg">Resolve</button>
+                </div>
             </div>
         `).join('') || '<p class="text-xs text-slate-500 py-4 text-center">No unresolved reports.</p>';
 
@@ -910,31 +955,59 @@ async function resolveReport(reportId) {
     }
 }
 
+function openChatWithUser(userId) {
+    state.selectedChatUserId = userId;
+    switchScreen('messages');
+}
+
 async function loadMessagesScreen() {
     const listEl = document.getElementById('msg-users-list');
     if (!listEl) return;
 
     if (state.isDemoMode) {
-        listEl.innerHTML = '<div class="p-2 text-xs text-indigo-400 cursor-pointer bg-slate-800 rounded-lg">@Mr. Deal</div>';
-        state.selectedChatUserId = 'user-deal';
-        renderMessageHistory();
+        state.allProfilesCache = [{ id: 'user-deal', username: 'Mr. Deal' }];
+        renderUsersListInMessages(state.allProfilesCache);
+        if (state.selectedChatUserId) renderMessageHistory();
         return;
     }
 
     try {
         const { data: profiles } = await state.supabase.from('profiles').select('id, username');
-        listEl.innerHTML = (profiles || []).map(p => `
-            <div onclick="selectChatUser('${p.id}')" class="p-2 text-xs text-slate-300 hover:bg-slate-800 rounded-lg cursor-pointer flex items-center justify-between">
-                <span>@${escapeHTML(p.username || 'User')}</span>
-            </div>
-        `).join('') || '<p class="text-xs text-slate-500">No users found.</p>';
+        state.allProfilesCache = profiles || [];
+        renderUsersListInMessages(state.allProfilesCache);
+        
+        if (state.selectedChatUserId) {
+            renderMessageHistory();
+        }
     } catch (err) {
         showPlainError(err.message);
     }
 }
 
+function renderUsersListInMessages(profiles) {
+    const listEl = document.getElementById('msg-users-list');
+    if (!listEl) return;
+
+    listEl.innerHTML = (profiles || []).map(p => `
+        <div onclick="selectChatUser('${p.id}')" class="p-2 text-xs rounded-lg cursor-pointer flex items-center justify-between transition-colors ${state.selectedChatUserId === p.id ? 'bg-indigo-600 text-white font-semibold' : 'text-slate-300 hover:bg-slate-800'}">
+            <span>@${escapeHTML(p.username || 'User')}</span>
+        </div>
+    `).join('') || '<p class="text-xs text-slate-500">No matching users found.</p>';
+}
+
+function filterMessageUsersList(searchTerm) {
+    const term = searchTerm.toLowerCase().trim();
+    if (!term) {
+        renderUsersListInMessages(state.allProfilesCache);
+        return;
+    }
+    const filtered = state.allProfilesCache.filter(p => (p.username || '').toLowerCase().includes(term));
+    renderUsersListInMessages(filtered);
+}
+
 function selectChatUser(userId) {
     state.selectedChatUserId = userId;
+    renderUsersListInMessages(state.allProfilesCache);
     renderMessageHistory();
 }
 
@@ -943,7 +1016,7 @@ async function renderMessageHistory() {
     if (!historyEl || !state.selectedChatUserId) return;
 
     if (state.isDemoMode) {
-        historyEl.innerHTML = `<div class="p-2 bg-indigo-900/40 rounded-xl text-xs text-indigo-200">Hello admin! Please check the physics notes.</div>`;
+        historyEl.innerHTML = `<div class="p-2 bg-indigo-900/40 rounded-xl text-xs text-indigo-200">Hello staff! Please check the physics notes.</div>`;
         return;
     }
 
@@ -965,7 +1038,9 @@ async function renderMessageHistory() {
                     </div>
                 </div>
             `;
-        }).join('') || '<p class="text-xs text-slate-500 text-center py-6">No messages yet.</p>';
+        }).join('') || '<p class="text-xs text-slate-500 text-center py-6">No messages yet. Say hello!</p>';
+
+        historyEl.scrollTop = historyEl.scrollHeight;
     } catch (err) {
         showPlainError(err.message);
     }

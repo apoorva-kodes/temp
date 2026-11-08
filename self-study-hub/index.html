@@ -33,7 +33,7 @@
     <header class="sticky top-0 z-40 bg-slate-900/80 backdrop-blur-md border-b border-slate-800">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
             
-            <!-- Brand Logo + Community Resources Button + Admin Toggle -->
+            <!-- Brand Logo + Community Resources Button + Admin/Mod Toggles -->
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-3 cursor-pointer" onclick="switchScreen('feed')">
                     <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
@@ -56,6 +56,14 @@
                     <span class="text-xs font-medium text-slate-400">Admin Mode</span>
                     <button id="admin-toggle-btn" onclick="toggleAdminViewMode()" class="w-11 h-6 bg-slate-700 rounded-full p-1 transition-colors duration-200 ease-in-out focus:outline-none">
                         <div id="admin-toggle-circle" class="w-4 h-4 bg-white rounded-full transition-transform duration-200 ease-in-out"></div>
+                    </button>
+                </div>
+
+                <!-- Moderator View Toggle Switch (Visible to Moderators) -->
+                <div id="mod-toggle-wrapper" class="hidden flex items-center gap-2 border-l border-slate-800 pl-4">
+                    <span class="text-xs font-medium text-amber-400">Mod Mode</span>
+                    <button id="mod-toggle-btn" onclick="toggleModViewMode()" class="w-11 h-6 bg-slate-700 rounded-full p-1 transition-colors duration-200 ease-in-out focus:outline-none">
+                        <div id="mod-toggle-circle" class="w-4 h-4 bg-white rounded-full transition-transform duration-200 ease-in-out"></div>
                     </button>
                 </div>
             </div>
@@ -377,7 +385,7 @@
                         <p class="text-xs text-slate-400">Review moderation reports submitted by moderators</p>
                     </div>
                     <button onclick="switchScreen('admin-panel')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">
-                        <i class="fa-solid fa-arrow-left mr-1"></i> Back to Admin Panel
+                        <i class="fa-solid fa-arrow-left mr-1"></i> Back to Dashboard
                     </button>
                 </div>
                 <div id="reports-list-container" class="space-y-3">
@@ -392,22 +400,28 @@
                 <div class="flex items-center justify-between pb-4 border-b border-slate-800">
                     <div>
                         <h2 class="text-xl font-bold text-white flex items-center gap-2">
-                            <i class="fa-solid fa-comments text-indigo-400"></i> Admin & Moderator Messaging
+                            <i class="fa-solid fa-comments text-indigo-400"></i> Staff & User Direct Messaging
                         </h2>
                         <p class="text-xs text-slate-400">Communicate directly with staff and community users</p>
                     </div>
-                    <button onclick="switchScreen('admin-panel')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">
-                        <i class="fa-solid fa-arrow-left mr-1"></i> Back to Admin
+                    <button onclick="switchScreen('feed')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">
+                        <i class="fa-solid fa-arrow-left mr-1"></i> Back to Home
                     </button>
                 </div>
                 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 h-96">
-                    <div class="border-r border-slate-800 pr-4 space-y-2 overflow-y-auto" id="msg-users-list">
-                        <p class="text-xs text-slate-500">Loading conversation list...</p>
+                    <div class="border-r border-slate-800 pr-4 flex flex-col gap-3">
+                        <div class="relative">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                            <input type="text" id="msg-user-search-input" oninput="filterMessageUsersList(this.value)" placeholder="Search username..." class="w-full pl-8 pr-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+                        </div>
+                        <div class="flex-1 space-y-1 overflow-y-auto" id="msg-users-list">
+                            <p class="text-xs text-slate-500">Loading conversation list...</p>
+                        </div>
                     </div>
                     <div class="md:col-span-2 flex flex-col justify-between bg-slate-950 rounded-2xl p-4 border border-slate-800">
                         <div id="msg-history-container" class="flex-1 overflow-y-auto space-y-3 pr-2">
-                            <p class="text-xs text-slate-500 text-center py-10">Select a user to view message thread</p>
+                            <p class="text-xs text-slate-500 text-center py-10">Select a user from the left sidebar to start messaging</p>
                         </div>
                         <div class="pt-3 flex gap-2 border-t border-slate-800">
                             <input type="text" id="msg-input" placeholder="Type message..." class="flex-1 px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
