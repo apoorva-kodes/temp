@@ -4,7 +4,7 @@ Build 2 plan: CONFIRMED by Build 2 Planner on October 4, 2026.
 
 ## What the app does and who it's for
 
-An AP study resource sharing platform where high school students self-studying AP classes (like AP Physics C, Calculus BC, Chemistry, etc.) can upload, organize, search, and share College Board progress checks, FRQs, practice problems, and class notes. Built for the student creator, Mr. Tortilla, Mr. Deal, and Mr. Sargus.
+An AP study resource sharing platform where high school students self-studying AP classes (like AP Physics C, Calculus BC, Chemistry, etc.) can upload, organize, search, and share College Board progress checks, FRQs, practice problems, and class notes. Built for the student creator, Mr. Tortilla, Mr. Deal, and Mr. Sargus. Includes role-based access for Admins and Moderators to review reports, manage users, and message staff or community members directly.
 
 ## Sign-in
 
@@ -31,18 +31,36 @@ An AP study resource sharing platform where high school students self-studying A
   * `file_size` (numeric)
   * `file_path` (text)
   * `created_at` (timestamp)
+* `admins`
+  * `user_id` (uuid, primary key, references profiles.id)
+* `moderators`
+  * `user_id` (uuid, primary key, references profiles.id)
+* `reports`
+  * `id` (uuid, primary key)
+  * `target_user_id` (uuid, references profiles.id)
+  * `reason` (text)
+  * `status` (text, e.g., 'unresolved', 'resolved')
+  * `created_at` (timestamp)
+* `messages`
+  * `id` (uuid, primary key)
+  * `sender_id` (uuid, references profiles.id)
+  * `receiver_id` (uuid, references profiles.id)
+  * `content` (text)
+  * `created_at` (timestamp)
 
 ## Who can see what
 
 * `profiles`: All signed-in users can read profiles to view usernames. Users can only edit/insert their own profile record.
-* `resources`: All signed-in users can read all resource posts (public by default). Users can only insert, update, or delete resource posts where `user_id` matches their own authenticated ID.
+* `resources`: All signed-in users can read all resource posts (public by default). Users can only insert, update, or delete resource posts where `user_id` matches their own authenticated ID, except Admins and Moderators who can delete reported/violating resources.
+* `admins` & `moderators`: Only staff members with appropriate role records can access the Admin Panel and Moderator Dashboard views.
+* `messages`: Authenticated staff and users can send direct messages to each other. Realtime Postgres changes listen across the `messages` table for instant updating and notifications.
 
 ## Buckets
 
 * Bucket Name: `user-files`
 * File Size Limit: 25 MB per file
 * Allowed File Types: `.jpg`, `.jpeg`, `.png`, `.webp`, `.gif`, `.mp4`, `.webm`, `.ogg`, `.mov`, `.mp3`, `.wav`, `.m4a`, `.pdf`
-* Bucket Rules: Publicly readable by all signed-in users; uploads and deletions restricted to the owner of the resource. Upload progress tracked in real-time using native `XMLHttpRequest` progress listeners against the Supabase Storage API.
+* Bucket Rules: Publicly readable by all signed-in users; uploads and deletions restricted to the owner of the resource or staff. Upload progress tracked in real-time using native `XMLHttpRequest` progress listeners against the Supabase Storage API.
 
 ## Screens
 
@@ -52,11 +70,14 @@ An AP study resource sharing platform where high school students self-studying A
 4. Dedicated Search & Filter Hub Screen (contains custom search text input, AP subject filter pills, and in-page live search results display)
 5. Dedicated Community Resources Screen (accessed via top navigation bar; displays top 10 most recent files per AP subject)
 6. Add Resource View (modal interface for file selection up to 25 MB with real-time percentage progress bar)
+7. Main Admin Panel Screen (manage registered user profiles, view upload counts, flag status, ban/delete users, and assign moderators)
+8. Moderator Dashboard Screen (review unresolved moderation reports, access messaging directly from header controls, and resolve tickets)
+9. Messages View (direct messaging interface between staff and users with real-time message auto-refresh, thread auto-scrolling, and toast/browser notifications)
 
 ## Code files
 
 * `index.html`: Contains all page structural content and CSS styles, loading `config.js` before `app.js`.
-* `app.js`: Contains all JavaScript logic, including Supabase client initialization, GitHub OAuth authentication, native XHR real-time upload progress tracking, search & filter routing, and UI rendering.
+* `app.js`: Contains all JavaScript logic, including Supabase client initialization, Realtime channel subscriptions (`postgres_changes`), GitHub OAuth authentication, native XHR upload progress tracking, staff permissions/routing, and direct messaging logic.
 * `config.js`: Contains only the Supabase project URL and the publishable key (`SUPABASE_ANON_KEY`).
 
 ## Rules for every chat
@@ -78,7 +99,7 @@ GitHub Pages URL: to fill in
 
 ## Where we are right now
 
-Architecture restructured: dedicated search page, community resources view, working GitHub OAuth sign-in, real-time native upload progress bar tracking, and 25 MB upload limit operational.
+Architecture restructured: dedicated search page, community resources view, working GitHub OAuth sign-in, real-time native upload progress bar tracking, 25 MB upload limit operational, Admin/Mod panels, and active real-time messaging with live notifications fully configured.
 
 ## NOT doing, on purpose
 
@@ -101,3 +122,9 @@ Set up additional subject collections or enhance mobile drawer navigation.
   - Fixed GitHub OAuth sign-in pipeline with dynamic redirect URLs and non-blocking profile resolution.
   - Reinstated real-time file upload progress bar using native `XMLHttpRequest` tracking.
   - Expanded file upload size limit from 10 MB to 25 MB across validation rules and UI labels.
+* November 10, 2026:
+  - Added real-time messaging using Supabase Realtime (`subscribeToIncomingMessages()`).
+  - Added automatic chat thread re-rendering and auto-scrolling (`renderMessageHistory()`).
+  - Added toast banners and browser native push notification prompts for incoming direct messages.
+  - Updated Moderator Dashboard screen layout to include direct access buttons to the Messages view.
+  - Updated permission checks in `switchScreen()` so moderators and admins can navigate seamlessly between reports and direct messaging.
