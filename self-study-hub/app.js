@@ -19,7 +19,8 @@ const state = {
     adminViewActive: false,
     modViewActive: false,
     selectedChatUserId: null,
-    allProfilesCache: []
+    allProfilesCache: [],
+    realtimeChannel: null
 };
 
 const AP_SUBJECTS = [
@@ -147,6 +148,10 @@ async function checkInitialSession() {
             await checkUserRoles(session.user.id);
             subscribeToIncomingMessages();
         } else {
+            if (state.realtimeChannel) {
+                state.supabase.removeChannel(state.realtimeChannel);
+                state.realtimeChannel = null;
+            }
             state.currentUser = null;
             state.currentProfile = null;
             state.isAdmin = false;
@@ -164,24 +169,48 @@ async function checkInitialSession() {
 function subscribeToIncomingMessages() {
     if (!state.currentUser || state.isDemoMode || !state.supabase) return;
 
-    state.supabase
-        .channel('public:messages')
+    if (state.realtimeChannel) {
+        state.supabase.removeChannel(state.realtimeChannel);
+    }
+
+    state.realtimeChannel = state.supabase
+        .channel(`messages_room_${state.currentUser.id}`)
         .on(
             'postgres_changes',
             {
                 event: 'INSERT',
                 schema: 'public',
-                table: 'messages',
-                filter: `receiver_id=eq.${state.currentUser.id}`
+                table: 'messages'
             },
             (payload) => {
-                showToast(`New message received!`, 'info');
-                if (state.activeScreen === 'messages') {
-                    renderMessageHistory();
+                const newMsg = payload.new;
+                if (!newMsg) return;
+
+                // Trigger if current user is receiver
+                if (newMsg.receiver_id === state.currentUser.id) {
+                    showToast('New message received!', 'info');
+                    
+                    // Trigger browser native notification if permitted
+                    if (window.Notification && Notification.permission === 'granted') {
+                        new Notification('AP Hub Message', { body: newMsg.content });
+                    }
+                }
+
+                // Auto-refresh chat thread if currently open with sender or receiver
+                if (state.activeScreen === 'messages' && state.selectedChatUserId) {
+                    if (newMsg.sender_id === state.selectedChatUserId || newMsg.receiver_id === state.selectedChatUserId) {
+                        renderMessageHistory();
+                    }
                 }
             }
         )
-        .subscribe();
+        .subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+                if (window.Notification && Notification.permission === 'default') {
+                    Notification.requestPermission();
+                }
+            }
+        });
 }
 
 async function checkUserRoles(userId) {
@@ -386,6 +415,10 @@ async function handleGitHubSignIn() {
 async function handleSignOut() {
     if (!state.isDemoMode) await state.supabase.auth.signOut();
     localStorage.removeItem('ap_hub_demo_user');
+    if (state.realtimeChannel) {
+        state.supabase.removeChannel(state.realtimeChannel);
+        state.realtimeChannel = null;
+    }
     state.currentUser = null;
     state.currentProfile = null;
     state.isAdmin = false;
@@ -465,7 +498,6 @@ function handleFileSelect(inputElement) {
     if (nameDisplay) nameDisplay.textContent = `${file.name} (${formatBytes(file.size)})`;
 }
 
-// Fixed Upload Handler with Native XHR for Reliable Real-Time Progress Events
 async function handleResourceUpload({ title, subject, tags, file }) {
     if (!file) return showToast('Please select a file to upload.', 'error');
 
@@ -514,7 +546,6 @@ async function handleResourceUpload({ title, subject, tags, file }) {
 
         const uploadUrl = `${window.SUPABASE_URL}/storage/v1/object/${BUCKET_NAME}/${filePath}`;
 
-        // Native XHR for Upload Progress Monitoring
         await new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();
             xhr.open('POST', uploadUrl, true);
@@ -757,6 +788,13 @@ function setupEventListeners() {
         });
     });
 
+    document.getElementById('msg-input')?.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            sendChatMessage();
+        }
+    });
+
     populateSubjectFilters();
 }
 
@@ -797,10 +835,10 @@ function showToast(msg, type = 'info') {
     const container = document.getElementById('toast-container');
     if (!container) return;
     const toast = document.createElement('div');
-    toast.className = `px-4 py-3 rounded-xl border bg-slate-900 text-xs font-medium text-slate-100 shadow-xl opacity-90`;
+    toast.className = `px-4 py-3 rounded-xl border bg-slate-900 text-xs font-medium text-slate-100 shadow-xl opacity-90 transition-all duration-300`;
     toast.textContent = msg;
     container.appendChild(toast);
-    setTimeout(() => toast.remove(), 3000);
+    setTimeout(() => toast.remove(), 4000);
 }
 
 function confirmDeleteResource(id, filePath) {
