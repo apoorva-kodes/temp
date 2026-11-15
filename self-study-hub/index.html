@@ -404,38 +404,36 @@
             <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-2xl">
                 <div class="flex items-center justify-between pb-4 border-b border-slate-800">
                     <div>
-                        <div class="flex items-center gap-2.5">
-                            <h2 class="text-xl font-bold text-white flex items-center gap-2">
-                                <i class="fa-solid fa-comments text-indigo-400"></i> Staff & User Direct Messaging
-                            </h2>
-                            <span id="msg-stream-status" class="hidden px-2 py-0.5 text-[10px] font-semibold bg-emerald-950 text-emerald-400 border border-emerald-800 rounded-full flex items-center gap-1">
+                        <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-comments text-indigo-400"></i> Staff & User Direct Messaging
+                            <span id="msg-stream-status" class="hidden items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-950/80 text-emerald-400 border border-emerald-700/60">
                                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Live HTML Stream
                             </span>
-                        </div>
+                        </h2>
                         <p class="text-xs text-slate-400">Communicate directly with staff and community users</p>
                     </div>
-                    <button onclick="switchScreen('feed')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl">
+                    <button onclick="switchScreen('feed')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition-colors">
                         <i class="fa-solid fa-arrow-left mr-1"></i> Back to Home
                     </button>
                 </div>
                 
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 h-96">
-                    <div class="border-r border-slate-800 pr-4 flex flex-col gap-3">
-                        <div class="relative">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 h-96 min-h-0 overflow-hidden">
+                    <div class="border-r border-slate-800 pr-4 flex flex-col gap-3 min-h-0 overflow-hidden">
+                        <div class="relative shrink-0">
                             <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
                             <input type="text" id="msg-user-search-input" oninput="filterMessageUsersList(this.value)" placeholder="Search username..." class="w-full pl-8 pr-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500">
                         </div>
-                        <div class="flex-1 space-y-1 overflow-y-auto" id="msg-users-list">
+                        <div class="flex-1 min-h-0 space-y-1 overflow-y-auto pr-1" id="msg-users-list">
                             <p class="text-xs text-slate-500">Loading conversation list...</p>
                         </div>
                     </div>
-                    <div class="md:col-span-2 flex flex-col justify-between bg-slate-950 rounded-2xl p-4 border border-slate-800">
-                        <div id="msg-history-container" class="flex-1 overflow-y-auto space-y-3 pr-2">
+                    <div class="md:col-span-2 flex flex-col justify-between bg-slate-950 rounded-2xl p-4 border border-slate-800 min-h-0 overflow-hidden">
+                        <div id="msg-history-container" class="flex-1 min-h-0 overflow-y-auto space-y-3 pr-2">
                             <p class="text-xs text-slate-500 text-center py-10">Select a user from the left sidebar to start messaging</p>
                         </div>
-                        <div class="pt-3 flex gap-2 border-t border-slate-800">
-                            <input type="text" id="msg-input" placeholder="Type message..." class="flex-1 px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
-                            <button onclick="sendChatMessage()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl">Send</button>
+                        <div class="pt-3 flex gap-2 border-t border-slate-800 shrink-0">
+                            <input type="text" id="msg-input" onkeydown="if(event.key==='Enter'){event.preventDefault();sendChatMessage();}" placeholder="Type message..." class="flex-1 px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                            <button onclick="sendChatMessage()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl transition-colors">Send</button>
                         </div>
                     </div>
                 </div>

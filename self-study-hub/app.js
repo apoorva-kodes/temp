@@ -20,8 +20,7 @@ const state = {
     modViewActive: false,
     selectedChatUserId: null,
     allProfilesCache: [],
-    realtimeChannel: null,
-    chatStreamController: null
+    realtimeChannel: null
 };
 
 const AP_SUBJECTS = [
@@ -149,7 +148,6 @@ async function checkInitialSession() {
             await checkUserRoles(session.user.id);
             subscribeToIncomingMessages();
         } else {
-            stopChatHtmlStream();
             if (state.realtimeChannel) {
                 state.supabase.removeChannel(state.realtimeChannel);
                 state.realtimeChannel = null;
@@ -188,10 +186,13 @@ function subscribeToIncomingMessages() {
                 const newMsg = payload.new;
                 if (!newMsg) return;
 
+                // Append to the open chat thread (if it belongs to it)
+                appendLiveMessage(newMsg);
+
                 // Trigger if current user is receiver
                 if (newMsg.receiver_id === state.currentUser.id) {
                     showToast('New message received!', 'info');
-                    
+
                     // Trigger browser native notification if permitted
                     if (window.Notification && Notification.permission === 'granted') {
                         new Notification('AP Hub Message', { body: newMsg.content });
@@ -201,6 +202,9 @@ function subscribeToIncomingMessages() {
         )
         .subscribe((status) => {
             if (status === 'SUBSCRIBED') {
+                // Catch up on anything missed while disconnected
+                if (state.activeScreen === 'messages') renderMessageHistory();
+
                 if (window.Notification && Notification.permission === 'default') {
                     Notification.requestPermission();
                 }
@@ -254,10 +258,29 @@ function updateRoleTogglesUI() {
     else modWrapper?.classList.add('hidden');
 }
 
+function resetStaffViewModes() {
+    state.adminViewActive = false;
+    state.modViewActive = false;
+
+    const adminBtn = document.getElementById('admin-toggle-btn');
+    const adminCircle = document.getElementById('admin-toggle-circle');
+    adminBtn?.classList.remove('bg-emerald-500');
+    adminBtn?.classList.add('bg-slate-700');
+    adminCircle?.classList.remove('translate-x-5');
+
+    const modBtn = document.getElementById('mod-toggle-btn');
+    const modCircle = document.getElementById('mod-toggle-circle');
+    modBtn?.classList.remove('bg-amber-500');
+    modBtn?.classList.add('bg-slate-700');
+    modCircle?.classList.remove('translate-x-5');
+}
+
 function toggleAdminViewMode() {
     if (!state.isAdmin) return;
-    state.adminViewActive = !state.adminViewActive;
-    
+    const nextAdminState = !state.adminViewActive;
+    resetStaffViewModes();
+    state.adminViewActive = nextAdminState;
+
     const btn = document.getElementById('admin-toggle-btn');
     const circle = document.getElementById('admin-toggle-circle');
 
@@ -267,17 +290,16 @@ function toggleAdminViewMode() {
         circle?.classList.add('translate-x-5');
         switchScreen('admin-panel');
     } else {
-        btn?.classList.remove('bg-emerald-500');
-        btn?.classList.add('bg-slate-700');
-        circle?.classList.remove('translate-x-5');
         switchScreen('feed');
     }
 }
 
 function toggleModViewMode() {
     if (!state.isModerator) return;
-    state.modViewActive = !state.modViewActive;
-    
+    const nextModState = !state.modViewActive;
+    resetStaffViewModes();
+    state.modViewActive = nextModState;
+
     const btn = document.getElementById('mod-toggle-btn');
     const circle = document.getElementById('mod-toggle-circle');
 
@@ -287,9 +309,6 @@ function toggleModViewMode() {
         circle?.classList.add('translate-x-5');
         switchScreen('reports');
     } else {
-        btn?.classList.remove('bg-amber-500');
-        btn?.classList.add('bg-slate-700');
-        circle?.classList.remove('translate-x-5');
         switchScreen('feed');
     }
 }
@@ -298,7 +317,7 @@ async function fetchUserProfile(userId) {
     if (state.isDemoMode) return;
     try {
         const { data } = await state.supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
-        
+
         if (data && data.username) {
             state.currentProfile = data;
             if (['auth', 'username-setup'].includes(state.activeScreen)) {
@@ -308,7 +327,7 @@ async function fetchUserProfile(userId) {
         } else {
             const fallbackHandle = state.currentUser?.user_metadata?.preferred_username || state.currentUser?.email?.split('@')[0] || `user_${userId.slice(0, 5)}`;
             const { error: upsertErr } = await state.supabase.from('profiles').upsert({ id: userId, username: fallbackHandle, created_at: new Date().toISOString() });
-            
+
             if (!upsertErr) {
                 state.currentProfile = { id: userId, username: fallbackHandle };
                 switchScreen('feed');
@@ -408,7 +427,6 @@ async function handleGitHubSignIn() {
 }
 
 async function handleSignOut() {
-    stopChatHtmlStream();
     if (!state.isDemoMode) await state.supabase.auth.signOut();
     localStorage.removeItem('ap_hub_demo_user');
     if (state.realtimeChannel) {
@@ -739,8 +757,8 @@ function switchScreen(screenName) {
         screenName = 'feed';
     }
 
-    if (state.activeScreen === 'messages' && screenName !== 'messages') {
-        stopChatHtmlStream();
+    if (screenName === 'feed') {
+        resetStaffViewModes();
     }
 
     state.activeScreen = screenName;
@@ -1040,7 +1058,7 @@ async function loadMessagesScreen() {
         const { data: profiles } = await state.supabase.from('profiles').select('id, username');
         state.allProfilesCache = profiles || [];
         renderUsersListInMessages(state.allProfilesCache);
-        
+
         if (state.selectedChatUserId) {
             renderMessageHistory();
         }
@@ -1076,115 +1094,66 @@ function selectChatUser(userId) {
     renderMessageHistory();
 }
 
-function stopChatHtmlStream() {
-    if (state.chatStreamController) {
-        state.chatStreamController.abort();
-        state.chatStreamController = null;
-    }
-    const statusBadge = document.getElementById('msg-stream-status');
-    if (statusBadge) statusBadge.classList.add('hidden');
+/* ==========================================================================
+   Live Chat (Supabase Realtime - no server-side streaming required)
+   ========================================================================== */
+
+function messageBubbleHTML(m) {
+    const isMe = m.sender_id === state.currentUser.id;
+    return `
+        <div data-msg-id="${escapeHTML(m.id)}" class="flex ${isMe ? 'justify-end' : 'justify-start'}">
+            <div class="max-w-xs px-3 py-2 rounded-xl text-xs ${isMe ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-200'}">
+                ${escapeHTML(m.content)}
+            </div>
+        </div>`;
 }
 
 async function renderMessageHistory() {
     const historyEl = document.getElementById('msg-history-container');
     if (!historyEl || !state.selectedChatUserId) return;
 
-    stopChatHtmlStream();
-
     if (state.isDemoMode) {
         historyEl.innerHTML = `<div class="p-2 bg-indigo-900/40 rounded-xl text-xs text-indigo-200">Hello staff! Please check the physics notes.</div>`;
         return;
     }
 
-    const controller = new AbortController();
-    state.chatStreamController = controller;
-
-    historyEl.innerHTML = '<p id="msg-empty-placeholder" class="text-xs text-slate-500 text-center py-6">Connecting to live HTML stream...</p>';
-
-    try {
-        const { data: sessionData } = await state.supabase.auth.getSession();
-        const accessToken = sessionData?.session?.access_token;
-
-        if (!accessToken) throw new Error('Session expired.');
-
-        const streamUrl = `/api/chat-stream?peerId=${encodeURIComponent(state.selectedChatUserId)}&token=${encodeURIComponent(accessToken)}`;
-        const response = await fetch(streamUrl, { signal: controller.signal });
-
-        if (!response.ok || !response.body) {
-            throw new Error(`Stream unavailable (${response.status})`);
-        }
-
-        const statusBadge = document.getElementById('msg-stream-status');
-        if (statusBadge) statusBadge.classList.remove('hidden');
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let hasReceivedMessages = false;
-
-        while (true) {
-            const { value, done } = await reader.read();
-            if (done) break;
-
-            const chunk = decoder.decode(value, { stream: true });
-            const trimmed = chunk.trim();
-
-            if (!trimmed) continue;
-
-            if (trimmed.includes('<!-- STREAM_CONNECTED -->') && !hasReceivedMessages) {
-                const placeholder = document.getElementById('msg-empty-placeholder');
-                if (placeholder) placeholder.textContent = 'No messages yet. Say hello!';
-                continue;
-            }
-
-            if (trimmed.startsWith('<div')) {
-                if (!hasReceivedMessages) {
-                    historyEl.innerHTML = '';
-                    hasReceivedMessages = true;
-                }
-                historyEl.insertAdjacentHTML('beforeend', trimmed);
-                historyEl.scrollTop = historyEl.scrollHeight;
-            }
-        }
-
-        // Automatically reconnect if the Vercel Edge stream reached its max duration while user is still viewing
-        if (!controller.signal.aborted && state.activeScreen === 'messages' && state.selectedChatUserId) {
-            renderMessageHistory();
-        }
-    } catch (err) {
-        if (err.name === 'AbortError') return;
-        // Fallback to direct Supabase query if running locally without Vercel Edge runtime
-        await renderMessageHistoryFallback();
-    }
-}
-
-async function renderMessageHistoryFallback() {
-    const historyEl = document.getElementById('msg-history-container');
-    if (!historyEl || !state.selectedChatUserId) return;
+    const peerId = state.selectedChatUserId;
+    const me = state.currentUser.id;
 
     try {
         const { data: messages, error } = await state.supabase
             .from('messages')
             .select('*')
-            .or(`and(sender_id.eq.${state.currentUser.id},receiver_id.eq.${state.selectedChatUserId}),and(sender_id.eq.${state.selectedChatUserId},receiver_id.eq.${state.currentUser.id})`)
+            .or(`and(sender_id.eq.${me},receiver_id.eq.${peerId}),and(sender_id.eq.${peerId},receiver_id.eq.${me})`)
             .order('created_at', { ascending: true });
-
         if (error) throw error;
 
-        historyEl.innerHTML = (messages || []).map(m => {
-            const isMe = m.sender_id === state.currentUser.id;
-            return `
-                <div class="flex ${isMe ? 'justify-end' : 'justify-start'}">
-                    <div class="max-w-xs px-3 py-2 rounded-xl text-xs ${isMe ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-200'}">
-                        ${escapeHTML(m.content)}
-                    </div>
-                </div>
-            `;
-        }).join('') || '<p class="text-xs text-slate-500 text-center py-6">No messages yet. Say hello!</p>';
+        if (peerId !== state.selectedChatUserId) return; // user switched chats mid-load
 
+        historyEl.innerHTML = (messages || []).map(messageBubbleHTML).join('')
+            || '<p class="no-msgs text-xs text-slate-500 text-center py-6">No messages yet. Say hello!</p>';
         historyEl.scrollTop = historyEl.scrollHeight;
     } catch (err) {
         showPlainError(err.message);
     }
+}
+
+function appendLiveMessage(m) {
+    if (state.activeScreen !== 'messages' || !state.selectedChatUserId) return;
+
+    const me = state.currentUser.id;
+    const peer = state.selectedChatUserId;
+    const inThread =
+        (m.sender_id === me && m.receiver_id === peer) ||
+        (m.sender_id === peer && m.receiver_id === me);
+    if (!inThread) return;
+
+    const historyEl = document.getElementById('msg-history-container');
+    if (!historyEl || historyEl.querySelector(`[data-msg-id="${m.id}"]`)) return; // dedupe
+
+    historyEl.querySelector('.no-msgs')?.remove();
+    historyEl.insertAdjacentHTML('beforeend', messageBubbleHTML(m));
+    historyEl.scrollTop = historyEl.scrollHeight;
 }
 
 async function sendChatMessage() {
