@@ -20,7 +20,8 @@ const state = {
     modViewActive: false,
     selectedChatUserId: null,
     allProfilesCache: [],
-    realtimeChannel: null
+    realtimeChannel: null,
+    chatStreamController: null
 };
 
 const AP_SUBJECTS = [
@@ -148,6 +149,7 @@ async function checkInitialSession() {
             await checkUserRoles(session.user.id);
             subscribeToIncomingMessages();
         } else {
+            stopChatHtmlStream();
             if (state.realtimeChannel) {
                 state.supabase.removeChannel(state.realtimeChannel);
                 state.realtimeChannel = null;
@@ -193,13 +195,6 @@ function subscribeToIncomingMessages() {
                     // Trigger browser native notification if permitted
                     if (window.Notification && Notification.permission === 'granted') {
                         new Notification('AP Hub Message', { body: newMsg.content });
-                    }
-                }
-
-                // Auto-refresh chat thread if currently open with sender or receiver
-                if (state.activeScreen === 'messages' && state.selectedChatUserId) {
-                    if (newMsg.sender_id === state.selectedChatUserId || newMsg.receiver_id === state.selectedChatUserId) {
-                        renderMessageHistory();
                     }
                 }
             }
@@ -413,6 +408,7 @@ async function handleGitHubSignIn() {
 }
 
 async function handleSignOut() {
+    stopChatHtmlStream();
     if (!state.isDemoMode) await state.supabase.auth.signOut();
     localStorage.removeItem('ap_hub_demo_user');
     if (state.realtimeChannel) {
@@ -741,6 +737,10 @@ function switchScreen(screenName) {
     } else if (['reports', 'messages'].includes(screenName) && !state.isAdmin && !state.isModerator) {
         showToast('Access denied: Staff permissions required.', 'error');
         screenName = 'feed';
+    }
+
+    if (state.activeScreen === 'messages' && screenName !== 'messages') {
+        stopChatHtmlStream();
     }
 
     state.activeScreen = screenName;
@@ -1076,14 +1076,90 @@ function selectChatUser(userId) {
     renderMessageHistory();
 }
 
+function stopChatHtmlStream() {
+    if (state.chatStreamController) {
+        state.chatStreamController.abort();
+        state.chatStreamController = null;
+    }
+    const statusBadge = document.getElementById('msg-stream-status');
+    if (statusBadge) statusBadge.classList.add('hidden');
+}
+
 async function renderMessageHistory() {
     const historyEl = document.getElementById('msg-history-container');
     if (!historyEl || !state.selectedChatUserId) return;
+
+    stopChatHtmlStream();
 
     if (state.isDemoMode) {
         historyEl.innerHTML = `<div class="p-2 bg-indigo-900/40 rounded-xl text-xs text-indigo-200">Hello staff! Please check the physics notes.</div>`;
         return;
     }
+
+    const controller = new AbortController();
+    state.chatStreamController = controller;
+
+    historyEl.innerHTML = '<p id="msg-empty-placeholder" class="text-xs text-slate-500 text-center py-6">Connecting to live HTML stream...</p>';
+
+    try {
+        const { data: sessionData } = await state.supabase.auth.getSession();
+        const accessToken = sessionData?.session?.access_token;
+
+        if (!accessToken) throw new Error('Session expired.');
+
+        const streamUrl = `/api/chat-stream?peerId=${encodeURIComponent(state.selectedChatUserId)}&token=${encodeURIComponent(accessToken)}`;
+        const response = await fetch(streamUrl, { signal: controller.signal });
+
+        if (!response.ok || !response.body) {
+            throw new Error(`Stream unavailable (${response.status})`);
+        }
+
+        const statusBadge = document.getElementById('msg-stream-status');
+        if (statusBadge) statusBadge.classList.remove('hidden');
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let hasReceivedMessages = false;
+
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            const trimmed = chunk.trim();
+
+            if (!trimmed) continue;
+
+            if (trimmed.includes('<!-- STREAM_CONNECTED -->') && !hasReceivedMessages) {
+                const placeholder = document.getElementById('msg-empty-placeholder');
+                if (placeholder) placeholder.textContent = 'No messages yet. Say hello!';
+                continue;
+            }
+
+            if (trimmed.startsWith('<div')) {
+                if (!hasReceivedMessages) {
+                    historyEl.innerHTML = '';
+                    hasReceivedMessages = true;
+                }
+                historyEl.insertAdjacentHTML('beforeend', trimmed);
+                historyEl.scrollTop = historyEl.scrollHeight;
+            }
+        }
+
+        // Automatically reconnect if the Vercel Edge stream reached its max duration while user is still viewing
+        if (!controller.signal.aborted && state.activeScreen === 'messages' && state.selectedChatUserId) {
+            renderMessageHistory();
+        }
+    } catch (err) {
+        if (err.name === 'AbortError') return;
+        // Fallback to direct Supabase query if running locally without Vercel Edge runtime
+        await renderMessageHistoryFallback();
+    }
+}
+
+async function renderMessageHistoryFallback() {
+    const historyEl = document.getElementById('msg-history-container');
+    if (!historyEl || !state.selectedChatUserId) return;
 
     try {
         const { data: messages, error } = await state.supabase
@@ -1130,7 +1206,6 @@ async function sendChatMessage() {
         });
         if (error) throw error;
         input.value = '';
-        await renderMessageHistory();
     } catch (err) {
         showPlainError(err.message);
     }
