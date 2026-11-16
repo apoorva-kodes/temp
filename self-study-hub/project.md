@@ -11,6 +11,7 @@ An AP study resource sharing platform where high school students self-studying A
 * Email + password sign-in with password enforcement (8+ characters, lowercase, uppercase, number).
 * Sign in with GitHub via OAuth (with dynamic callback redirect to origin/pathname).
 * Persistent sessions across refreshes and sign-out functionality.
+* Privacy Policy agreement prompt on account creation / first sign-in with **Agree** and **Disagree** buttons stored in `profiles.agreed_policy`.
 * Unique username setup on first sign-in for all authentication methods (both Email and GitHub OAuth) to display `@username` handles instead of emails across the app. Automatic fallback handle generation for GitHub users if initial profile creation is bypassed.
 
 ## Tables
@@ -18,6 +19,7 @@ An AP study resource sharing platform where high school students self-studying A
 * `profiles`
   * `id` (uuid, primary key, references auth.users)
   * `username` (text, unique)
+  * `agreed_policy` (boolean, default false)
   * `created_at` (timestamp)
 * `resources`
   * `id` (uuid, primary key)
@@ -65,14 +67,15 @@ An AP study resource sharing platform where high school students self-studying A
 ## Screens
 
 1. Sign In / Sign Up Screen (with working GitHub OAuth sign-in)
-2. Username Setup Screen (for first-time sign-ins)
-3. Homepage Main Feed (shows user's Saved Files and My Files; top header search triggers redirect to Search Page)
-4. Dedicated Search & Filter Hub Screen (contains custom search text input, AP subject filter pills, and in-page live search results display)
-5. Dedicated Community Resources Screen (accessed via top navigation bar; displays top 10 most recent files per AP subject)
-6. Add Resource View (modal interface for file selection up to 25 MB with real-time percentage progress bar)
-7. Main Admin Panel Screen (manage registered user profiles, view upload counts, flag status, ban/delete users, and assign moderators)
-8. Moderator Dashboard Screen (review unresolved moderation reports, access messaging directly from header controls, and resolve tickets)
-9. Messages View (direct messaging interface between staff and users with real-time message auto-refresh, thread auto-scrolling, and toast/browser notifications)
+2. Privacy Policy Modal (shown on account creation / first sign-in with Agree and Disagree buttons)
+3. Username Setup Screen (for first-time sign-ins)
+4. Homepage Main Feed (shows user's Saved Files and My Files; top header search triggers redirect to Search Page)
+5. Dedicated Search & Filter Hub Screen (contains custom search text input, AP subject filter pills, and in-page live search results display)
+6. Dedicated Community Resources Screen (accessed via top navigation bar; displays top 10 most recent files per AP subject)
+7. Add Resource View (modal interface for file selection up to 25 MB with real-time percentage progress bar)
+8. Main Admin Panel Screen (manage registered user profiles, view upload counts, flag status, ban/delete users, and assign moderators)
+9. Moderator Dashboard Screen (review unresolved moderation reports, access messaging directly from header controls, and resolve tickets)
+10. Messages View (direct messaging interface between staff and users with real-time message auto-refresh, thread auto-scrolling, and toast/browser notifications)
 
 ## Code files
 
@@ -99,7 +102,7 @@ GitHub Pages URL: to fill in
 
 ## Where we are right now
 
-Architecture restructured: dedicated search page, community resources view, working GitHub OAuth sign-in, real-time native upload progress bar tracking, 25 MB upload limit operational, Admin/Mod panels, and active real-time messaging with live notifications fully configured.
+Architecture restructured: dedicated search page, community resources view, working GitHub OAuth sign-in, real-time native upload progress bar tracking, 25 MB upload limit operational, Admin/Mod panels, active real-time messaging with live notifications, and Privacy Policy consent modal on first sign-in/sign-up fully configured.
 
 ## NOT doing, on purpose
 
@@ -128,3 +131,7 @@ Set up additional subject collections or enhance mobile drawer navigation.
   - Added toast banners and browser native push notification prompts for incoming direct messages.
   - Updated Moderator Dashboard screen layout to include direct access buttons to the Messages view.
   - Updated permission checks in `switchScreen()` so moderators and admins can navigate seamlessly between reports and direct messaging.
+* November 16, 2026:
+  - Added the Privacy Policy modal (`#privacy-policy-modal`) to `index.html` with scrollable policy terms and **Agree** / **Disagree** action buttons.
+  - Added `promptPrivacyPolicy()` and `savePolicyDecision()` in `app.js` to display the policy on account creation or first sign-in (Email/Password, GitHub OAuth, and Demo Mode), saving `agreed_policy` (`true`/`false`) to Supabase `profiles` and signing out users who disagree.
+  - Documented `agreed_policy` in `project.md`.
