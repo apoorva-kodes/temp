@@ -20,7 +20,8 @@ const state = {
     modViewActive: false,
     selectedChatUserId: null,
     allProfilesCache: [],
-    realtimeChannel: null
+    realtimeChannel: null,
+    isNewSignupSession: false
 };
 
 const AP_SUBJECTS = [
@@ -127,12 +128,19 @@ async function checkInitialSession() {
         if (demoUser) {
             const userObj = JSON.parse(demoUser);
             state.currentUser = userObj;
-            state.currentProfile = { username: userObj.username || 'demo_user' };
+            state.currentProfile = { username: userObj.username || 'demo_user', agreed_policy: !!userObj.agreed_policy };
             loadSavedFileIds();
             await checkUserRoles(userObj.id);
             subscribeToIncomingMessages();
-            switchScreen('feed');
-            await loadResources();
+            if (!state.currentProfile.agreed_policy) {
+                promptPrivacyPolicy(async () => {
+                    switchScreen('feed');
+                    await loadResources();
+                });
+            } else {
+                switchScreen('feed');
+                await loadResources();
+            }
         } else {
             switchScreen('auth');
         }
@@ -313,6 +321,70 @@ function toggleModViewMode() {
     }
 }
 
+async function savePolicyDecision(agreed) {
+    if (!state.currentUser) return;
+
+    if (state.isDemoMode) {
+        const saved = localStorage.getItem('ap_hub_demo_user');
+        const userObj = saved ? JSON.parse(saved) : { id: state.currentUser.id, email: state.currentUser.email, username: state.currentProfile?.username || '' };
+        userObj.agreed_policy = agreed;
+        localStorage.setItem('ap_hub_demo_user', JSON.stringify(userObj));
+        if (state.currentProfile) state.currentProfile.agreed_policy = agreed;
+        return;
+    }
+
+    const fallbackHandle = state.currentProfile?.username || state.currentUser?.user_metadata?.preferred_username || state.currentUser?.email?.split('@')[0] || `user_${state.currentUser.id.slice(0, 5)}`;
+    const payload = {
+        id: state.currentUser.id,
+        username: fallbackHandle,
+        agreed_policy: agreed
+    };
+    if (!state.currentProfile?.created_at) {
+        payload.created_at = new Date().toISOString();
+    }
+
+    const { error } = await state.supabase.from('profiles').upsert(payload);
+    if (error) {
+        showPlainError(error.message);
+    } else if (state.currentProfile) {
+        state.currentProfile.agreed_policy = agreed;
+    }
+}
+
+function promptPrivacyPolicy(onAgreedCallback) {
+    const modal = document.getElementById('privacy-policy-modal');
+    const agreeBtn = document.getElementById('policy-agree-btn');
+    const disagreeBtn = document.getElementById('policy-disagree-btn');
+    if (!modal || !agreeBtn || !disagreeBtn) {
+        if (onAgreedCallback) onAgreedCallback();
+        return;
+    }
+
+    modal.classList.remove('hidden');
+
+    agreeBtn.onclick = async () => {
+        agreeBtn.disabled = true;
+        disagreeBtn.disabled = true;
+        await savePolicyDecision(true);
+        modal.classList.add('hidden');
+        agreeBtn.disabled = false;
+        disagreeBtn.disabled = false;
+        showToast('Privacy Policy accepted.', 'success');
+        if (onAgreedCallback) await onAgreedCallback();
+    };
+
+    disagreeBtn.onclick = async () => {
+        agreeBtn.disabled = true;
+        disagreeBtn.disabled = true;
+        await savePolicyDecision(false);
+        modal.classList.add('hidden');
+        agreeBtn.disabled = false;
+        disagreeBtn.disabled = false;
+        showToast('You must agree to the Privacy Policy to use AP Study Hub.', 'error');
+        await handleSignOut();
+    };
+}
+
 async function fetchUserProfile(userId) {
     if (state.isDemoMode) return;
     try {
@@ -320,24 +392,48 @@ async function fetchUserProfile(userId) {
 
         if (data && data.username) {
             state.currentProfile = data;
-            if (['auth', 'username-setup'].includes(state.activeScreen)) {
-                switchScreen('feed');
-                await loadResources();
+            const proceedToFeed = async () => {
+                if (['auth', 'username-setup'].includes(state.activeScreen)) {
+                    switchScreen('feed');
+                    await loadResources();
+                }
+                updateNavUI();
+            };
+
+            if (!data.agreed_policy) {
+                promptPrivacyPolicy(proceedToFeed);
+            } else {
+                await proceedToFeed();
             }
         } else {
             const fallbackHandle = state.currentUser?.user_metadata?.preferred_username || state.currentUser?.email?.split('@')[0] || `user_${userId.slice(0, 5)}`;
-            const { error: upsertErr } = await state.supabase.from('profiles').upsert({ id: userId, username: fallbackHandle, created_at: new Date().toISOString() });
+            const createdAt = new Date().toISOString();
+            const { error: upsertErr } = await state.supabase.from('profiles').upsert({
+                id: userId,
+                username: fallbackHandle,
+                agreed_policy: false,
+                created_at: createdAt
+            });
 
             if (!upsertErr) {
-                state.currentProfile = { id: userId, username: fallbackHandle };
-                switchScreen('feed');
-                await loadResources();
+                state.currentProfile = { id: userId, username: fallbackHandle, agreed_policy: false, created_at: createdAt };
+                promptPrivacyPolicy(async () => {
+                    switchScreen('feed');
+                    await loadResources();
+                    updateNavUI();
+                });
             } else {
-                switchScreen('username-setup');
+                promptPrivacyPolicy(async () => {
+                    switchScreen('username-setup');
+                    updateNavUI();
+                });
             }
         }
     } catch (e) {
-        switchScreen('username-setup');
+        promptPrivacyPolicy(async () => {
+            switchScreen('username-setup');
+            updateNavUI();
+        });
     }
     updateNavUI();
 }
@@ -358,34 +454,51 @@ function dismissErrorBanner() {
 
 async function handleSignUp(email, password) {
     if (state.isDemoMode) {
-        const newUser = { id: 'user-' + Date.now(), email, username: '' };
+        const newUser = { id: 'user-' + Date.now(), email, username: '', agreed_policy: false };
         state.currentUser = newUser;
         localStorage.setItem('ap_hub_demo_user', JSON.stringify(newUser));
-        switchScreen('username-setup');
-        updateNavUI();
+        promptPrivacyPolicy(() => {
+            switchScreen('username-setup');
+            updateNavUI();
+        });
         return;
     }
+    state.isNewSignupSession = true;
     const { data, error } = await state.supabase.auth.signUp({ email, password });
-    if (error) return showPlainError(error.message);
+    if (error) {
+        state.isNewSignupSession = false;
+        return showPlainError(error.message);
+    }
     if (data.user) {
         state.currentUser = data.user;
-        switchScreen('username-setup');
+        promptPrivacyPolicy(() => {
+            switchScreen('username-setup');
+            updateNavUI();
+        });
     }
 }
 
 async function handleSignIn(email, password) {
     if (state.isDemoMode) {
         const savedUser = localStorage.getItem('ap_hub_demo_user');
-        let userObj = savedUser ? JSON.parse(savedUser) : { id: 'user-demo', email, username: email.split('@')[0] };
+        let userObj = savedUser ? JSON.parse(savedUser) : { id: 'user-demo', email, username: email.split('@')[0], agreed_policy: false };
         state.currentUser = userObj;
-        state.currentProfile = { username: userObj.username };
+        state.currentProfile = { username: userObj.username, agreed_policy: !!userObj.agreed_policy };
         localStorage.setItem('ap_hub_demo_user', JSON.stringify(userObj));
         loadSavedFileIds();
         await checkUserRoles(userObj.id);
         subscribeToIncomingMessages();
-        switchScreen('feed');
-        await loadResources();
-        updateNavUI();
+        if (!state.currentProfile.agreed_policy) {
+            promptPrivacyPolicy(async () => {
+                switchScreen('feed');
+                await loadResources();
+                updateNavUI();
+            });
+        } else {
+            switchScreen('feed');
+            await loadResources();
+            updateNavUI();
+        }
         return;
     }
     const { data, error } = await state.supabase.auth.signInWithPassword({ email, password });
@@ -399,15 +512,17 @@ async function handleSignIn(email, password) {
 
 async function handleGitHubSignIn() {
     if (state.isDemoMode) {
-        const githubUser = { id: 'user-github', email: 'github_student@example.com', username: 'github_student' };
+        const githubUser = { id: 'user-github', email: 'github_student@example.com', username: 'github_student', agreed_policy: false };
         state.currentUser = githubUser;
-        state.currentProfile = { username: githubUser.username };
+        state.currentProfile = { username: githubUser.username, agreed_policy: false };
         localStorage.setItem('ap_hub_demo_user', JSON.stringify(githubUser));
         loadSavedFileIds();
-        showToast('Signed in with GitHub (Demo Mode)!', 'success');
-        switchScreen('feed');
-        await loadResources();
-        updateNavUI();
+        promptPrivacyPolicy(async () => {
+            showToast('Signed in with GitHub (Demo Mode)!', 'success');
+            switchScreen('feed');
+            await loadResources();
+            updateNavUI();
+        });
         return;
     }
 
@@ -439,6 +554,7 @@ async function handleSignOut() {
     state.isModerator = false;
     state.adminViewActive = false;
     state.modViewActive = false;
+    state.isNewSignupSession = false;
     switchScreen('auth');
     updateNavUI();
 }
@@ -448,17 +564,30 @@ async function handleUsernameSetup(username) {
     if (!trimmed || trimmed.length < 3) return showToast('Username must be 3+ chars', 'error');
 
     if (state.isDemoMode) {
-        state.currentProfile = { username: trimmed };
+        const agreed = !!state.currentProfile?.agreed_policy;
+        state.currentProfile = { username: trimmed, agreed_policy: agreed };
+        const saved = localStorage.getItem('ap_hub_demo_user');
+        if (saved) {
+            const u = JSON.parse(saved);
+            u.username = trimmed;
+            localStorage.setItem('ap_hub_demo_user', JSON.stringify(u));
+        }
         switchScreen('feed');
         await loadResources();
         updateNavUI();
         return;
     }
 
-    const { error } = await state.supabase.from('profiles').upsert({ id: state.currentUser.id, username: trimmed, created_at: new Date().toISOString() });
+    const agreed = !!state.currentProfile?.agreed_policy;
+    const { error } = await state.supabase.from('profiles').upsert({
+        id: state.currentUser.id,
+        username: trimmed,
+        agreed_policy: agreed,
+        created_at: new Date().toISOString()
+    });
     if (error) return showPlainError(error.message);
 
-    state.currentProfile = { id: state.currentUser.id, username: trimmed };
+    state.currentProfile = { id: state.currentUser.id, username: trimmed, agreed_policy: agreed };
     switchScreen('feed');
     await loadResources();
     updateNavUI();
