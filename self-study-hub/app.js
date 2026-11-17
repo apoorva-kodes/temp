@@ -188,7 +188,8 @@ function subscribeToIncomingMessages() {
             {
                 event: 'INSERT',
                 schema: 'public',
-                table: 'messages'
+                table: 'messages',
+                filter: `receiver_id=eq.${state.currentUser.id}`
             },
             (payload) => {
                 const newMsg = payload.new;
@@ -881,7 +882,7 @@ function switchScreen(screenName) {
     if (screenName === 'admin-panel' && !state.isAdmin) {
         showToast('Access denied: Admin permissions required.', 'error');
         screenName = 'feed';
-    } else if (['reports', 'messages'].includes(screenName) && !state.isAdmin && !state.isModerator) {
+    } else if (screenName === 'reports' && !state.isAdmin && !state.isModerator) {
         showToast('Access denied: Staff permissions required.', 'error');
         screenName = 'feed';
     }
@@ -1297,14 +1298,19 @@ async function sendChatMessage() {
     }
 
     try {
-        const { error } = await state.supabase.from('messages').insert({
+    const { data, error } = await state.supabase
+        .from('messages')
+        .insert({
             sender_id: state.currentUser.id,
             receiver_id: state.selectedChatUserId,
             content
-        });
-        if (error) throw error;
-        input.value = '';
-    } catch (err) {
-        showPlainError(err.message);
-    }
+        })
+        .select()
+        .single();
+    if (error) throw error;
+    input.value = '';
+    appendLiveMessage(data); // show instantly; the dedupe check ignores the Realtime echo
+} catch (err) {
+    showPlainError(err.message);
+}
 }
