@@ -175,11 +175,10 @@ async function checkInitialSession() {
 }
 
 function subscribeToIncomingMessages() {
-    if (!state.currentUser || state.isDemoMode || !state.supabase) return;
+    if (state.realtimeChannel && state.realtimeUserId === state.currentUser.id) return; // already subscribed
 
-    if (state.realtimeChannel) {
-        state.supabase.removeChannel(state.realtimeChannel);
-    }
+    if (state.realtimeChannel) state.supabase.removeChannel(state.realtimeChannel);
+    state.realtimeUserId = state.currentUser.id;
 
     state.realtimeChannel = state.supabase
         .channel(`messages_room_${state.currentUser.id}`)
@@ -1298,19 +1297,22 @@ async function sendChatMessage() {
     }
 
     try {
-    const { data, error } = await state.supabase
-        .from('messages')
-        .insert({
-            sender_id: state.currentUser.id,
-            receiver_id: state.selectedChatUserId,
-            content
-        })
-        .select()
-        .single();
-    if (error) throw error;
-    input.value = '';
-    appendLiveMessage(data); // show instantly; the dedupe check ignores the Realtime echo
-} catch (err) {
-    showPlainError(err.message);
-}
+        console.time('insert');   // start timer
+        const { data, error } = await state.supabase
+            .from('messages')
+            .insert({
+                sender_id: state.currentUser.id,
+                receiver_id: state.selectedChatUserId,
+                content
+            })
+            .select()
+            .single();
+        console.timeEnd('insert'); // stop timer, prints "insert: 123ms" to the console
+
+        if (error) throw error;
+        input.value = '';
+        appendLiveMessage(data);   // show instantly; dedupe ignores the Realtime echo
+    } catch (err) {
+        showPlainError(err.message);
+    }
 }
