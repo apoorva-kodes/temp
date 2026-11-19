@@ -192,6 +192,7 @@ function subscribeToIncomingMessages() {
                 filter: `receiver_id=eq.${state.currentUser.id}`
             },
             (payload) => {
+                console.log(new Date().toISOString(), 'Realtime INSERT received:', payload.new);
                 const newMsg = payload.new;
                 if (!newMsg) return;
 
