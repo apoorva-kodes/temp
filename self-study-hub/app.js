@@ -150,6 +150,7 @@ async function checkInitialSession() {
 
     state.supabase.auth.onAuthStateChange(async (event, session) => {
         if (session && session.user) {
+            state.supabase.realtime.setAuth(session.access_token);
             state.currentUser = session.user;
             loadSavedFileIds();
             await fetchUserProfile(session.user.id);
@@ -208,7 +209,8 @@ function subscribeToIncomingMessages() {
                 }
             }
         )
-        .subscribe((status) => {
+        .subscribe((status, err) => {
+            console.log(new Date().toISOString(), 'Realtime status:', status, err || '');
             if (status === 'SUBSCRIBED') {
                 // Catch up on anything missed while disconnected
                 if (state.activeScreen === 'messages') renderMessageHistory();
@@ -504,6 +506,7 @@ async function handleSignIn(email, password) {
     const { data, error } = await state.supabase.auth.signInWithPassword({ email, password });
     if (error) return showPlainError(error.message);
     state.currentUser = data.user;
+    state.supabase.realtime.setAuth(data.session.access_token);
     loadSavedFileIds();
     await fetchUserProfile(data.user.id);
     await checkUserRoles(data.user.id);
